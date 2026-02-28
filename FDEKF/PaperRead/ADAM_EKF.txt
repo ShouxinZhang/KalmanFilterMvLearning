@@ -1,0 +1,834 @@
+For consideration in IEEE Transactions on Signal Processing                                                    Page 1 of 13
+
+
+
+
+    Regular Paper
+
+    Use Extended Kalman Filter to Interpret and Improve Learning
+    Rate
+
+    Submission ID            40c62d9c-5b44-4808-b0fc-94a8a57fa0aa
+
+    Submission Version       Initial Submission
+
+    PDF Generation           13 Jul 2025 03:50:18 EST by Atypon ReX
+
+
+
+
+    Authors
+
+    Mr. Weisheng Chen
+    Submitting Author
+                                                              Affiliations
+         ORCiD                                                • School of Sciences, Harbin Institute of Technology
+       https://orcid.org/0009-0000-1525-5549                    (Shenzhen), Shenzhen, Guangdong, China
+
+    Mr. Changan Liu
+                                                              Affiliations
+         ORCiD                                                • School of Sciences, Harbin Institute of Technology
+       https://orcid.org/0009-0001-3437-468X                    (Shenzhen), Shenzhen, Guangdong, China
+
+    Dr. Yunqi Chen
+                                                              Affiliations
+                                                              • School of Sciences, Harbin Institute of Technology
+                                                                (Shenzhen), Shenzhen, Guangdong, China
+
+    Prof. Zhibin Yan
+    Corresponding Author
+                                                              Affiliations
+         ORCiD                                                • School of Sciences, Harbin Institute of Technology
+       https://orcid.org/0000-0001-5551-5202                    (Shenzhen), Shenzhen, Guangdong, China
+
+
+
+
+    Additional Information
+
+    EDICS
+    ASP ADAPTIVE SIGNAL PROCESSING / 2. ASP-APPL Applications of adaptive filters
+For consideration in IEEE Transactions on Signal Processing                                                                 Page 2 of 13
+
+    2. ASP-APPL Applications of adaptive filters
+
+    SPC SIGNAL PROCESSING FOR COMMUNICATIONS / 109. SPC-APPL Applications involving signal processing for
+    communications
+    109. SPC-APPL Applications involving signal processing for communications
+
+    SSP STATISTICAL SIGNAL PROCESSING / 148. SSP-IDEN System identification
+    148. SSP-IDEN System identification
+
+    SSP STATISTICAL SIGNAL PROCESSING / 152. SSP-PARE Parameter estimation
+    152. SSP-PARE Parameter estimation
+
+    Subject Category
+    ADAPTIVE SIGNAL PROCESSING
+    DESIGN AND IMPLEMENTATION OF SIGNAL PROCESSING SYSTEMS
+    MACHINE LEARNING
+    OPTIMIZATION METHODS FOR SIGNAL PROCESSING
+    SIGNAL PROCESSING FOR COMMUNICATIONS
+    STATISTICAL SIGNAL PROCESSING
+    Is this manuscript a resubmission of, or related to, a previously rejected manuscript, or a previously reviewed
+    and withdrawn manuscript?
+    No
+
+
+    Is this manuscript an extended version of a conference publication (or conference article accepted for
+    publication)?
+    No
+
+
+    Is this manuscript related to any other papers of the authors that are either published, accepted for publication,
+    or currently under review, and that are not included among the references cited in the manuscript?
+    No
+
+
+    Are there any preprints of the manuscript (i.e. preprints that are identical to the submitted manuscript, except
+    for minor differences) that have been posted on the authors’ personal website, employer’s website or
+    institutional repository, arXiv.org, TechRxiv.org, or on any not-for-profit preprint server approved by the IEEE?
+    No
+
+
+    Are there any other posted preprints that should not be considered to be prior art?
+    No
+
+
+    Explain in detail why the contribution of this manuscript is within the scope of the IEEE Transactions on Signal
+    Processing?
+    1. Theory: New insight on EKF gain as an adaptive learning rate governed by covariance matrices (P,Q,R), an important topic
+    in parameter estimation.
+
+    2. Algorithm: We formalize FDEKF via a state-space model and propose the novel RR-FDEKF for high-data-rate task, a key
+    challenge in adaptive filtering.
+
+    3. Application: Our proposed algorithm outperforms the Adam optimizer, achieving lower error and faster convergence in PIM
+    cancellation (signal processing for communication).
+
+
+    Why is the contribution significant (What impact will it have)?
+For consideration in IEEE Transactions on Signal Processing                                                                    Page 3 of 13
+
+    1. Theory: We reframe the EKF as an interpretable optimization framework, a theoretically-grounded alternative to heuristic
+    methods.
+
+    2. Implementation: The novel RR-FDEKF significantly reduces complexity, making EKF-based approach viable for large-scale,
+    real-time system identification.
+
+    3. Application: We solve the critical PIM cancellation challenge in communication, showing substantial engineering value through
+    its superior performance against a strong baseline.
+
+
+    What are the three papers in the published literature most closely related to this paper?
+    Note: To provide key details within the 500-character limit, citing full titles and DOIs:
+
+    1. "Decoupled extended kalman filter training of feedforward layered networks" DOI: 10.1109/IJCNN.1991.155276
+
+    2. "Training of convolutional neural networks for image classification with fully decoupled extended kalman filter" DOI:
+    10.3390/a17060243
+
+    3. "Symmetrized Basis Function Approximation Network for Passive Intermodulation Cancellation" DOI:
+    10.1109/TCOMM.2025.3560338
+
+
+    What is distinctive/new about the current paper relative to these previously published works?
+    1. Relative to Puskorius '91: We provide a rigorous state-space derivation for the FDEKF and then propose the novel RR-FDEKF
+    with its sequential update mechanism.
+
+    2. Unlike Gaytan '24's application, we provide new insight on EKF gain as an adaptive learning rate and propose the novel,
+    superior RR-FDEKF.
+
+    3. Complementary to Liu '25: Their work focused on proposing the PIM model architecture. Our contribution is a new,
+    computationally efficient parameter estimation method for their model.
+For consideration in IEEE Transactions on Signal Processing                                                     Page 4 of 13
+
+
+
+    Files for peer review
+    All files submitted by the author for peer review are listed below. Files that could not be converted to PDF are
+    indicated; reviewers are able to access them online.
+
+
+    Name                                  Type of File                       Size             Page
+
+    Use_Extended_Kalman_Filter_to_I
+    nterpret_and_Improve_Learning_        Main Document - PDF                1.5 MB           Page 5
+    Rate__submit.pdf
+                                                                                                                    Page 5 of 13
+
+
+
+
+                                                                                                                                           1
+
+
+
+
+          Use Extended Kalman Filter to Interpret and
+                   Improve Learning Rate
+                                    Weisheng Chen, Changan Liu, Yunqi Chen, Zhibin Yan
+
+
+
+
+   Abstract—This paper clarifies the physical interpretation of           efficiently and accurately presents a significant challenge,
+learning rate in nonlinear system identification using the extended       motivating the search for suitable estimation frameworks.
+Kalman filter (EKF). To handle applications with rapidly arriving             The Kalman filter framework is a cornerstone for state
+data, the fully decoupled extended Kalman filter (FDEKF) is
+improved into a new one, called Round-Robin fully decoupled               and parameter estimation, providing the optimal estimator in
+extended Kalman filter (RR-FDEKF). This algorithm features a              the mean-squared error sense for linear systems subject to
+Round-Robin mechanism in parameter update, which utilizes a               Gaussian noise [7]–[9]. Further, as many real-world systems
+specially constructed mixed-information state vector to immedi-           exhibit nonlinear dynamics or measurement relationships, the
+ately use new measurement information. The effectiveness of both          extended Kalman filter (EKF) was introduced [10]–[12]. The
+FDEKF and RR-FDEKF are demonstrated using experimental
+data in passive intermodulation (PIM) cancellation, a challenging         EKF addresses nonlinearity by linearizing the system around
+real-world task in wireless communication. They achieve supe-             the current state estimate at each time step, enabling the
+rior PIM suppression with significant computational advantages            application of the prediction-update mechanism in the Kalman
+compared to the Adam optimizer, a recently highly recognized              filter. Its effectiveness has been proven in diverse applications,
+estimation strategy in deep learning. These findings highlight            from navigation [13] to biological systems [10], [14]–[21].
+the potential of FDEKF and RR-FDEKF as efficient and high-
+performance solutions for online nonlinear parameter estimation.              Despite its widespread use, the practical application of
+                                                                          the EKF faces significant hurdles, particularly for high-
+  Index Terms—System Identification, Extended Kalman Filter,
+                                                                          dimensional systems. When applied to system identification,
+Adam, Deep learning, Passive Intermodulation.
+                                                                          the number of parameters, denoted by n in following, adds
+                                                                          to the dimension of the system. Since the number n can be
+                        I. I NTRODUCTION                                  very large, the identification task suffers from considerable
+                                                                          computational complexity, typically scaling quadratically or
+     YSTEM identification is the process of constructing math-
+S    ematical models of dynamic systems, and the subsequent
+estimation of model parameters from observed data. funda-
+                                                                          worse with n due to operations involving the n × n covari-
+                                                                          ance matrix. Furthermore, it encounters potential numerical
+                                                                          instability issues, especially for high nonlinearity or poor ini-
+mental challenges across numerous scientific and engineering              tializations [22]. These limitations motivate the development
+fields, including control systems, signal processing, economet-           of more efficient and robust schemes of applying the EKF in
+rics, and machine learning [1], [2]. While the architecture of            system identification.
+a model establishes the upper bound on achievable model per-
+formance, parameter estimation determines the lower bound,
+or the actual fidelity of the identified model.                           A. Motivations
+   A prominent example demanding advanced system identifi-                   To overcome the computational and numerical challenges of
+cation arises in wireless communications with the mitigation              the EKF, various approximation and simplification strategies
+of passive intermodulation (PIM) distortion. PIM generates                have been proposed. A prominent direction involves decou-
+unwanted interference signals due to nonlinearities in passive            pling, which aims to reduce complexity by simplifying the
+components, significantly degrading receiver sensitivity, espe-           structure of the error covariance matrix, often by assuming
+cially in co-located transmit/receive systems or multi-carrier            independence or limited correlation between different states
+scenarios [3], [4]. Digital PIM cancellation technique offers a           or parameters.
+flexible solution but hinges on accurately identifying the un-               The initial drive towards decoupling in the context of
+derlying nonlinear dynamics from observed signals. Capturing              neural network training led to the independent EKF (IEKF)
+the complex behavior and memory effects inherent in PIM                   philosophy. Pioneering works, such as those by Kollias and
+often necessitates sophisticated, high-dimensional nonlinear              Anastassiou [23] and Shah and Palmieri with their MEKA
+models, such as Volterra series or basis function networks [5],           algorithm [24], proposed assigning independent filters to each
+[6]. Estimating the large number of parameters in these models            neuron’s weights. These methods prioritized complete com-
+                                                                          putational locality, performing updates locally and eliminating
+  This work was supported in part by HUAWEI under the project
+TC20210609011, “PIM digital modeling based on multi-dimensional nonlin-   the need for a global coordination matrix, thereby achieving
+ear System”, and by NSF of China under Grant 62273056.                    significant speedups. Building upon these early explorations,
+  The authors are with School of Sciences, Harbin Institute of            Puskorius and Feldkamp [25] introduced a different formula-
+Technology (Shenzhen), Shenzhen, Guangdong, China (e-mail:
+23s058018@stu.hit.edu.cn; 22b358003@stu.hit.edu.cn; zbyan@hit.edu.cn;     tion, which they termed the decoupled EKF (DEKF). While
+cyq09180@163.com).                                                        acknowledging the efficiency of IEKF, their approach aimed
+                                                                                                             Page 6 of 13
+
+
+
+
+                                                                                                                                    2
+
+
+
+for greater theoretical rigor by retaining a degree of indirect       3) High-Performance Digital PIM Cancellation via Ef-
+global coupling. Their framework, even in its fully decoupled            ficient System Identification: We successfully address
+limit, coordinates updates through a shared global scaling               the challenging task of digital PIM cancellation by
+matrix that incorporates information from all parameters. This           developing an efficient identification scheme based on
+was intended to yield more stable and accurate performance               decoupled Kalman filtering. Experimental results using
+compared to the purely local IEKF approaches.                            real-world data demonstrate that our approach yields
+   In this paper, we revisit and formalize the original IEKF             superior PIM suppression and faster convergence com-
+philosophy, focusing on its most granular and computation-               pared to the widely-used Adam optimizer, underscoring
+ally efficient realization. We adopt a formulation where each            its practical efficacy for complex, real-world communi-
+individual parameter is updated by a self-contained, scalar              cation systems.
+EKF. Hereafter, we refer to this specific, fully local variant as
+the fully decoupled extended Kalman filter (FDEKF), while
+                                                                    C. Organization
+acknowledging its conceptual distinction from the globally-
+coordinated version of Puskorius and Feldkamp. The principle           The remainder of this paper is organized as follows. Sec-
+of such independent estimation has also been explored in            tion II establishes the theoretical foundation of our work. It
+other contexts [26], [27]. The decoupling strategy itself has       begins by formulating the parameter estimation problem, then
+seen a resurgence in interest, with FDEKF-like approaches           re-examines it from the EKF perspective, and culminates in
+being successfully applied in modern, computationally inten-        our novel interpretation of the filter’s core covariance matrices
+sive domains like deep neural network training [21]. This           as the mechanism behind its adaptive learning rate. Building
+historical trajectory highlights a recurring theme: algorithmic     on this foundation, Section III introduces two computationally
+approximations developed to address past computational limits       efficient algorithms. We first derive the FDEKF based on
+often find renewed relevance as problem scales grow and             state-space model and then present our proposed RR-FDEKF,
+computing power evolves.                                            designed for high-efficiency, online applications. Section IV
+   The practical success of these decoupling strategies moti-       provides a comprehensive experimental validation of the pro-
+vates a clear, formal derivation from a state-space perspective.    posed method. We detail the experimental setup, define the
+While foundational insights exist in early works [23], [24], our    performance metrics, and present a comparative analysis of the
+work contributes a self-contained and direct derivation for the     results. Finally, Section V concludes the paper by summarizing
+FDEKF. This provides a solid basis for systematic analysis          our key findings and suggesting potential avenues for future
+and, as a direct extension, allows us to introduce a novel          research.
+variation called the Round-Robin fully decoupled extended
+Kalman filter (RR-FDEKF).                                           D. Notations
+B. Contributions                                                      Throughout this paper, we adhere to the following notational
+  The primary contributions are summarized as follows:              conventions:
+  1) Interpretable Adaptive Learning Rate Mechanism of                • Matrices are represented by boldface capital letters (e.g.,
+     the EKF: This work proposes a novel framework for                  P, Q, R). The Kalman gain, Kk , is also denoted this
+     interpreting the EKF’s update mechanism, casting the               way as it is a matrix in the general case.
+     Kalman gain as an interpretable, self-adaptive learning          • Vectors are column vectors denoted by boldface lower-
+     rate. We elucidate how the interplay between the process           case letters (e.g., θ, x, y). Row vectors, if not covered
+     noise (Qk ), measurement noise (Rk ), and the estimated            by other conventions, may also follow this format or be
+     parameter uncertainty (Pk ) dynamically tunes the filter’s         represented as transposes (e.g., hT ).
+     learning rate. This provides a novel contrast to modern          • Scalars are represented by normal (non-bold) lowercase
+     optimizers like Adam, whose adaptive mechanisms are                letters (e.g., n, p, q, t, k).
+     primarily heuristic and lack this direct physical ground-        • The transpose of a matrix or vector is denoted by the
+     ing.                                                               superscript T (e.g., PT , θ T ).
+  2) Formalization of FDEKF and Proposal of RR-                       • A right subscript indicates the discrete time step (e.g.,
+     FDEKF: We first establish a rigorous theoretical foun-             θk , yk ).
+     dation for the FDEKF by deriving it from state-space             • Estimates are denoted with a hat (ˆ   ·). The notation θ̂k|j
+     model, clarifying its underlying assumptions. Building             represents the estimate of θ at time k given measurements
+     on this clear foundation, we then introduce the RR-                up to time j. For brevity, the updated estimate θ̂k|k and
+     FDEKF, a novel algorithm that improves upon the                    its covariance Pk|k are often written simply as θ̂k and
+     decoupled extended Kalman filter approach. By updating             Pk .
+                                                                                                             i
+     only a single parameter per measurement in a sequential,         • For the decoupled algorithms, Pk denotes the scalar
+     round-robin fashion, RR-FDEKF is specifically designed             variance of the i-th parameter.
+     to be advantageous for scenarios where the data arrival          • The innovation or measurement residual is denoted by
+     rate is high relative to the available computational re-           ỹk . For the RR-FDEKF variant, which uses a dual index
+     sources, especially when dealing with a large number               of a cycle k and an intra-cycle step i, this is written as
+     of parameters.                                                     ỹk,i .
+                                                                                                                    Page 7 of 13
+
+
+
+
+                                                                                                                                         3
+
+
+
+  II. EKF VERSUS LMS: INTERPRETING LEARNING RATE                        reframes parameter estimation as a probabilistic inference
+A. Problem Formulation                                                  problem within a state-space model. It “trades” statistical prior
+                                                                        knowledge about the system, which is encapsulated in the
+   The physical process in the actual system is often highly            process and measurement noise covariance matrices Q and
+complex and difficult to describe precisely, but a mathematical         R, for an optimally adaptive and highly interpretable learning
+model provides a reasonable and effective simplified represen-          gain. This gain is not based on heuristics, but is derived
+tation. We describe the parameterized mathematical model for            from a rigorous, uncertainty-aware framework. In exchange for
+a general causal system, conceptually illustrated in Fig. 1. The        this interpretability, the EKF framework entails a significant
+input-output relationship at time step k is given by                    computational and storage cost of O(n2 ), arising from the
+                  yk = f (θ; xk , xk−1 , . . .) + ek ,                  manipulation of the full parameter covariance matrix.
+
+where yk ∈ Rq is the system output at time step k, ŷk =                B. Extended Kalman Filter for Parameter Estimation
+f (θ; xk , xk−1 , . . .) ∈ Rq is the model output, θ ∈ Rn is
+the vector of n parameters to be identified, xk ∈ Rp is the                To estimate the parameters θ in nonlinear systems using
+system input vector, f (·), an operator parametrized by θ, maps         a recursive filtering approach, we formulate the problem
+input signal into the predicted value of output, representing the       within a state-space framework. The parameter vector itself is
+model structure, and ek ∈ Rq represents the model error.                treated as the state, and its dynamics, along with the system’s
+                                                                        measurement process, are described as follows:
+                                                                                       (
+                                                                                         θk = θk−1 + wk−1
+                                                                                                                                    (2)
+                                                                                         yk = f (θk ; xk , xk−1 , . . .) + vk
+                                                                        where wk−1 ∈ Rn is the process noise and vk ∈ Rq is the
+                                                                        measurement noise. Both are assumed to be independent, zero-
+                                                                        mean Gaussian white noise sequences with covariances Qk−1
+                                                                        and Rk , respectively.
+                                                                          The EKF algorithm provides a recursive solution by iterat-
+Fig. 1. Conceptual diagram of the parameter estimation process.
+                                                                        ing through two main stages: prediction and update. Starting
+                                                                        with an initial parameter estimate θ̂0 and its error covariance
+   The goal of parameter estimation is to find an estimate θ̂           P0 , the algorithm proceeds as follows for each time step k:
+that makes the model output approximate the system output                 Prediction:
+data as closely as possible. A standard formulation for this                                θ̂k|k−1 = θ̂k−1
+problem over a batch of k data points is the minimization of
+                                                                                           Pk|k−1 = Pk−1 + Qk−1
+the least-squares cost function
+                                   k                                      Update:
+                            1X
+                     J(θ) =    ∥yl − ŷl ∥2 .                     (1)             ∂f (θ; xk , xk−1 , . . .)
+                            2                                              Hk =
+                                  l=1
+                                                                                          ∂θ T              θ=θ̂k|k−1
+However, in many applications, data arrives sequentially, ne-
+                                                                           Kk = Pk|k−1 HTk (Hk Pk|k−1 HTk + Rk )−1                     (3)
+cessitating an online or recursive algorithm that updates the                                                                     
+estimate θ̂k−1 to θ̂k using only the new data (xk , yk ). The              θ̂k = θ̂k|k−1 + Kk yk − f (θ̂k|k−1 ; xk , xk−1 , . . .)     (4)
+choice of such an algorithm depends critically on the nature
+                                                                           Pk = (I − Kk Hk )Pk|k−1
+of the operator f (·).
+   If the model is linear with respect to the parameters the            This prediction-update cycle repeats for each new data point,
+cost function in Eq. (1) has an exact analytical solution that          recursively refining the parameter estimate θ̂k .
+can be computed recursively. This is the celebrated recursive              This recursive prediction-update cycle forms the core of the
+least squares (RLS) algorithm, which recursively computes the           EKF algorithm. However, the true elegance of this framework
+optimal solution at each time step [28].                                lies not merely in its procedural steps, but in its underlying
+   For the more general nonlinear case, the recursive analytical        principle of optimal, adaptive estimation. The key to this
+solution is no longer available. A common alternative is to             is the Kalman gain, Kk . It is not a static, manually-tuned
+employ gradient-based methods, such as the least mean square            hyperparameter, but an optimally adaptive learning rate matrix
+(LMS) algorithm [28], [29] or modern variants like Adam [30],           that is dynamically re-computed at each time step.
+[31]. These methods iteratively adjust the parameters based on             This gain provides a statistically principled way to fuse new
+the instantaneous error, guided by a manually-tuned learning            information with existing knowledge. It masterfully balances
+rate µ. While computationally convenient, this learning rate            the confidence in the model’s own prediction (quantified by
+is a heuristic hyperparameter that lacks a clear, interpretable         the error covariance Pk|k−1 ) against the reliability of the
+connection to the system’s underlying properties.                       incoming measurement (quantified by the noise covariance
+   A fundamentally different paradigm is offered by the EKF.            Rk ). This ability to intelligently weigh information based on
+Rather than directly minimizing a cost function, the EKF                a rigorous model of uncertainty is the source of the EKF’s
+                                                                                                                   Page 8 of 13
+
+
+
+
+                                                                                                                                            4
+
+
+
+profound interpretability. To fully appreciate the power of this            are invariably influenced by environmental disturbances,
+mechanism, the next section will dive deeper into the statistical           making Qk almost always non-zero.
+meaning of these components and how they enable such an                   • Measurement Noise Covariance (R): The matrix Rk
+interpretable learning process.                                             is the covariance of the measurement noise, defined as
+                                                                            E[vk vkT ]. The vector vk in the system model represents
+                                                                            the combined effects of physical measurement error and
+C. Interpretable Adaptive Learning Rate                                     inaccuracies in the model function f (·). A large value
+   In signal processing, the choice of learning rate significantly          for Rk indicates that measurements are noisy or unre-
+impacts the convergence speed and stability of parameter                    liable, compelling the filter to down-weight them with a
+updates. The traditional LMS algorithm employs a fixed                      smaller Kalman gain. This value can often be determined
+learning rate, which, while simple to implement, may lead                   from sensor specifications or estimated from offline data
+to slow convergence or instability when dealing with non-                   analysis.
+stationary signals or complex environments. In contrast, the              In summary, the EKF provides a profoundly interpretable
+EKF dynamically adjusts its learning rate through a formula            learning mechanism. Through the interplay of Pk , Qk , and
+based on covariance matrices and noise estimation, enabling            Rk , the Kalman gain Kk achieves an optimal, real-time
+more accurate tracking of system parameter variations and              balance between trusting the model’s existing knowledge and
+achieving more robust and effective updates.                           embracing new, incoming data. This intelligent, data-driven
+   In the LMS algorithm, the parameter update                          adjustment enables superior performance compared to fixed-
+                                                                     learning-rate methods, especially in dynamic systems.
+          θ̂k = θ̂k−1 + µHT k yk − f (θ̂k−1 ; xk , . . .)
+
+relies on a fixed learning rate µ [28]. This fixed learning                      III. I MPROVING FDEKF I NTO RR-FDEKF
+rate strategy often struggles to balance convergence speed and            The preceding section established the EKF as a theoretically
+stability when faced with changing system dynamics or data             powerful framework for parameter estimation, celebrated for
+statistics.                                                            its profound interpretability and statistically optimal and adap-
+    In contrast, the parameter update for the extended Kalman          tive learning. In an ideal setting, it would be the definitive tool
+filter is performed using the rule defined in (4). The Kalman          for the problems addressed in this paper.
+Gain Kk in this equation, calculated via (3), acts as an adaptive         However, a critical obstacle severely limits its practical
+learning rate. Unlike a fixed value, it is a matrix dynamically        application: its prohibitive computational cost. The core of
+computed based on the statistical information of the system.           the EKF algorithm requires the storage and manipulation of
+This adaptability stems from the three core covariance matri-          the full n × n error covariance matrix Pk , leading to a com-
+ces: P (state error covariance), Q (process noise covariance),         putational complexity that scales as O(n2 ) with the number
+and R (measurement noise covariance). Understanding the                of parameters, n. This quadratic scaling renders the EKF
+statistical meaning of these three matrices is key to recognizing      impractical for the high-dimensional estimation challenges
+the adaptive power of the extended Kalman filter.                      prevalent in modern complex systems.
+    • State Error Covariance Matrix (Pk ): The matrix Pk is
+      the covariance of the parameter estimation error, defined        A. FDEKF for Parameter Estimation
+      as E[(θ− θ̂)(θ− θ̂)T ]. A larger Pk signifies greater uncer-        To alleviate the computational burden, a natural simplifi-
+      tainty, leading the filter to trust new measurements more        cation is to ignore some interdependence between the sys-
+      (via a larger Kalman gain Kk ). Conversely, a smaller Pk         tem parameters; this approach is referred to as decoupled
+      indicates higher confidence, causing the filter to rely more     extended Kalman filter (DEKF) [25], [28]. While various
+      on its own prediction. In practice, when the initial state of    DEKF formulations exist, we adopt a fully decoupled, local
+      the parameter is highly uncertain, the covariance matrix         implementation that aligns with the independent EKF (IEKF)
+      P0 is generally initialized as a diagonal matrix with            philosophy [23], [24]. This specific formulation, known as the
+      diagonal elements set to variances significantly larger          FDEKF, prioritizes computational efficiency and is realized by
+      than the expected range of the state variables. This setup       treating each parameter as an independent state.
+      indicates significant initial uncertainty, enabling the filter      For the parameter vector θk = [θk1 , θk2 , . . . , θkn ]T , we for-
+      to prioritize early measurements and accelerate parameter        mulate n independent scalar state-space models, each corre-
+      estimation improvement.                                          sponding to a single parameter component θki . The i-th model
+    • Process Noise Covariance Matrix (Qk ): The matrix
+                                                                       corresponding to the i-th parameter θki is given by
+      Qk , defined as E[wk wkT ], represents the covariance of                    ( i      i         i
+      random, unpredictable changes in the true parameters                          θk = θk−1   + wk−1    ,
+      between time steps, capturing these small perturbations                                 i     −i
+                                                                                                                                          (5)
+                                                                                    yk = fi (θk ; θ̂k−1 , xk , xk−1 , . . .) + vk .
+      in the actual system. A larger Qk indicates greater sys-
+      tem disturbances, leading to more significant parameter          Here
+                                                                               i
+      variations. In particular, Qk = 0 implies that the system          •    wk−1  ∼ N (0, Qik−1 ) is the scalar process noise, where
+                                                                                i
+      is time-invariant, with parameters assumed to remain con-               Qk−1 is the i-th diagonal element of the overall process
+      stant over time. In practice, real-world physical systems               noise covariance matrix Qk−1 .
+                                                                                                                                  Page 9 of 13
+
+
+
+
+                                                                                                                                                        5
+
+
+
+       −i         1               i−1     i+1             n
+   • θ̂k−1  = [θ̂k−1  , . . . , θ̂k−1 , θ̂k−1 , . . . , θ̂k−1 ]T represents the   dimension q is small relative to the parameter dimension n
+     estimated parameter vector except θ̂i .                                      (specifically, when q 3 ≪ n), the FDEKF provides substantial
+          i    −i                                                                 computational savings. This renders the FDEKF particularly
+  • fi (θk ; θ̂k−1 , xk , . . .) represents the measurement function
+     from the perspective of the i-th model.                                      advantageous for high-dimensional parameter estimation prob-
+  • vk ∼ N (0, Rk ) is the measurement noise, independent                         lems.
+     of wki .
+  Applying the EKF framework to each model (5) indepen-
+dently yields each parameter estimation.
+  Prediction: For each parameter i = 1, . . . , n:
+                          i         i
+                        θ̂k|k−1 = θ̂k−1
+                                                                                  B. RR-FDEKF for Parameter Estimation
+                        i        i
+                       Pk|k−1 = Pk−1 + Qik−1 .
+   Update: For each parameter i = 1, . . . , n:
+                                                                                     The FDEKF processes a single measurement yk to update
+                                            −i
+                ỹki = yk − fi (θ̂k|k−1
+                                  i
+                                        ; θ̂k−1 , xk , . . .)                     all n parameter estimates at one time step. Sometimes, these
+                Sik = hik Pk|k−1
+                           i
+                                 (hik )T + Rk                                     n number of estimates can not be arranged completely in
+                                                                                  parallel. This is typical when the model architecture involves
+                Kik = Pk|k−1
+                       i
+                             (hik )T (Sik )−1                                     multilayered blocks which are cascaded. Therefore a signif-
+                 θ̂ki = θ̂k|k−1
+                          i
+                                + Kik ỹki                                        icant challenge emerges when we need to deal with a con-
+                                                                                  tinuous stream of measurements arriving at a high frequency
+                Pki = (1 − Kik hik )Pk|k−1
+                                     i
+                                           ,
+                                                                                  and the real-time online running is essential for engineering
+where the Jacobian hik is computed as                                             requirement. The processing time required for the FDEKF to
+                              −i                                                  update all n parameters exceeds the extremely short interval
+                  ∂fi (θi ; θ̂k−1 , xk , xk−1 , . . .)                            between consecutive measurements in a rapid stream.
+          hik =                                                        .
+                                 ∂θi                   θ i =θ̂ i
+                                                               k|k−1                 To reduce computational complexity, we propose RR-
+   The overall FDEKF algorithm is summarized in Algo-                             FDEKF, which only updates a single parameter θi using per
+rithm 1.                                                                          measurement. To formalize this, we structure the algorithm
+                                                                                  around logical processing cycles, indexed by k = 1, 2, . . . .
+Algorithm 1 FDEKF Algorithm                                                       Within each cycle, parameters are updated sequentially from
+ 1: Initialization: For i = 1, . . . , n, initialize θ̂0i and P0i .               i = 1 to n. We establish a direct mapping from the original
+ 2: for each time step k = 1, 2, . . . do                                         continuous data stream, indexed by time t = 1, 2, . . . , to our
+ 3:       for each parameter i = 1, . . . , n do                                  cyclical framework (k, i). The measurement yk,i and input
+ 4:           Predict:                                                            history starting with xk,i used in the i-th step of the k-
+                    i         i                                                   th cycle correspond to the data from the physical time step
+ 5:               θ̂k|k−1 = θ̂k−1
+ 6:                   i
+                  Pk|k−1 = Pk−1 i
+                                  + Qik−1                                         t = (k − 1)n + i.
+ 7:           Update:                                                               This process is illustrated in Fig. 2.
+                                        −i
+                            ∂fi (θ i ;θ̂k−1 ,xk ,...)
+ 8:                 hik =              ∂θ i
+                                                      i
+                                               θ i =θ̂k|k−1
+                                                                                     The dynamics of each parameter θi and its relationship
+                       i             i         −i                                 to the corresponding measurement yk,i within this cyclical
+ 9:                 ỹk = yk − fi (θ̂k|k−1 ; θ̂k−1 , xk , . . .)
+                                                                                  framework are described by the following state-space model:
+10:                 Sik = hik Pk|k−1
+                                 i
+                                     (hik )T + Rk
+11:                 Kk = Pk|k−1 (hik )T (Sik )−1
+                        i      i
+
+12:                 θ̂ki = θ̂k|k−1
+                             i
+                                   + Kik ỹki                                               (
+13:                 Pk = (1 − Kik hik )Pk|k−1
+                        i                   i                                                θki = θk−1
+                                                                                                    i      i
+                                                                                                        + wk−1
+14:    end for                                                                                 yk,i = fi (θki ; ξki , xk,i , xk,i−1 , . . .) + vk,i
+15: end for
+
+
+   For a system with n parameters and an q-dimensional                                            i
+                                                                                  where wk−1            ∼ N (0, Qik−1 ) is the process noise accumulating
+measurement vector, the computational complexity of FDEKF
+                                                                                  between cycles, and vk,i ∼ N (0, Rk,i ) is the measure-
+is primarily determined by the n independent update calcula-
+                                                                                  ment noise associated with the specific measurement yk,i .
+tions. Each such update requires operations on q × q matrices,
+                                                                                  The vector ξki denotes the “mixed-cycle” information vec-
+such as forming and inverting the innovation covariance Sik ,
+                                                                                  tor used for the i-th update, composed of the most recent
+contributing O(q 3 ) per parameter. Consequently, the dominant
+                                                                                  estimates of all other parameters, and is defined as ξki =
+complexity for the FDEKF update stage is O(nq 3 ). This
+                                                                                  [θ̂k1 , . . . , θ̂ki−1 , θ̂k−1
+                                                                                                             i+1             n
+                                                                                                                 , . . . , θ̂k−1 ]T .
+contrasts sharply with the EKF, which typically incurs a
+complexity of O(n2 ) due to operations involving the full                           The complete algorithm based on this cyclical structure is
+n × n covariance matrix. Therefore, when the measurement                          described in Algorithm 2.
+                                                                                                                       Page 10 of 13
+
+
+
+
+                                                                                                                                                  6
+
+
+
+
+Fig. 2. Conceptual illustration of RR-FDEKF within a processing k-th cycle.
+
+
+Algorithm 2 RR-FDEKF Algorithm                                                as effective as possible, the algorithm constructs the mixed-
+ 1: Initialization: For i = 1, . . . , n, initialize θ̂0i and P0i .           cycle vector ξki , which leverages the most current informa-
+ 2: for each logical processing cycle k = 1, 2, . . . do                      tion available. By incorporating the freshly updated estimates
+ 3:     for each parameter index i = 1, . . . , n do                          (θ̂k1 , . . . , θ̂ki−1 ) from within the same cycle, information from
+ 4:         Let (yk,i , xk,i , . . . ) be the data from the physical          earlier updates immediately cascades to benefit later ones. This
+    time step t = (k − 1)n + i.                                               intra-cycle information propagation ensures that the algorithm
+ 5:        Predict:                                                           converges efficiently, making each measurement’s contribution
+ 6:               i
+                θ̂k|k−1 = θ̂k−1 i                                             count to the fullest extent.
+                    i             i
+ 7:             Pk|k−1 = Pk−1             + Qik−1
+ 8:        Update:                                                                           IV. E XPERIMENTAL VALIDATION
+ 9:             Construct the mixed-cycle vector                                 In this section, we evaluate the performance of the FDEKF
+10:
+                                                 i+1
+                ξki = [θ̂k1 , . . . , θ̂ki−1 , θ̂k−1             n
+                                                     , . . . , θ̂k−1 ]T       and RR-FDEKF for parameter estimation in complex nonlin-
+                               ∂fi (θ i ;ξk
+                                          i
+                                            ,xk,i ,...)
+11:                 hk,i =               ∂θ i
+                                                                              ear systems. We test these algorithms on a practical scenario
+                                                       i
+                                                θ i =θ̂k|k−1                  involving PIM cancellation, using real-world measurement
+                                         i          i                         data. We compare FDEKF and RR-FDEKF against the Adam
+12:                 ỹk,i = yk,i − fi (θ̂k|k−1 ; ξk , xk,i , . . .)
+13:                                i
+                    Sk,i = hk,i Pk|k−1   (hk,i )T + Rk,i                      optimizer, a widely used benchmark algorithm, focusing on
+14:                 Kk,i = Pk|k−1 (hk,i )T (Sk,i )−1
+                                i                                             estimation accuracy and computational efficiency.
+15:                 θ̂ki = θ̂k|k−1
+                             i
+                                   + Kk,i ỹk,i
+16:                     i                     i
+                    Pk = (1 − Kk,i hk,i )Pk|k−1                               A. Experimental Setup
+17:    end for                                                                   PIM cancellation is a critical challenge in modern wireless
+18: end for                                                                   communication systems, requiring accurate parameter estima-
+                                                                              tion for effective cancellation. The conceptual block diagram
+   The elegance of the RR-FDEKF lies in its sequential update                 of the simultaneous transmit-receive communication system
+strategy, which maximizes data utility at minimal cost. At any                is shown in Fig. 3. The real-world measurement data for
+given time step, the single measurement vector yk,i is used                   this study are collected from the laboratory setup. To model
+to refine only one parameter, θi . To make this single update                 the nonlinear PIM generation, we employed the Symmetrized
+                                                                                                                   Page 11 of 13
+
+
+
+
+                                                                                                                                               7
+
+
+
+Basis Function Approximation Network (BFAN) as presented                    FDEKF. Specifically, it shared the same initial error
+in [32]. This model maps the input signals to a single scalar               variances P0i , measurement noise variance Rk , and the
+output (i.e., q = 1) representing the estimated PIM interfer-               dynamic schedule for the process noise variance Qik .
+ence, using a set of n = 232 parameters (θ) that need to                 In real-world scenarios, the optimal model parameters θtrue
+be identified. The key objective of our work is to accurately         for interference cancellation are unknown due to complex
+estimate the parameter of the model.                                  signal environments. To evaluate algorithm effectiveness, two
+                                                                      practical metrics are used. The primary metric, residual PIM
+                                                                      power (in dB), measures the power of uncancelled inter-
+                                                                      modulation distortion after cancellation. The second metric,
+                                                                      computational efficiency, is assessed as the average execution
+                                                                      time required to process each data sample and update the
+                                                                      model parameters.
+
+                                                                      C. Results and Analysis
+                                                                         We compare FDEKF, RR-FDEKF, and the baseline Adam
+                                                                      optimizer for PIM cancellation, showing that both decoupled
+                                                                      Kalman filter methods significantly outperform Adam. The
+                                                                      Power Spectral Density (PSD) plot in Fig. 4 shows that
+Fig. 3. Block diagram of the digital PIM cancellation system setup.   FDEKF and RR-FDEKF achieve much lower residual error
+                                                                      than Adam. Table I provides the precise results: after 400
+                                                                      epochs, FDEKF and RR-FDEKF attained residual PIM of 2.56
+B. Evaluation Setup                                                   dB and 2.61 dB, respectively, compared to Adam’s 4.77 dB.
+   To ensure the reproducibility of these experiments, we detail         The residual error plot in Fig. 5 underscores the superior
+the experimental setup for evaluating the parameter estimation        performance of the decoupled Kalman filter methods. Their
+algorithms. All methods are implemented in Python using               adaptive learning rate mechanism drives a remarkably rapid
+PyTorch to ensure a consistent environment. The experiments           decline in residual error during early iterations, while also
+are conducted on a workstation equipped with an Intel(R)              achieving lower final residual error compared to Adam. Ad-
+Xeon(R) CPU @ 2.20GHz. The initial parameters for all                 ditionally, the Kalman filter-based methods exhibit markedly
+algorithms are initialized from a N (0, 0.01) distribution. We        improved stability. As presented in Table I, the final standard
+process the dataset of 64,800 samples one by one, where one           deviations for FDEKF at 0.19 dB and RR-FDEKF at 0.25
+full pass through the dataset defines a single training epoch.        dB are over three times lower than Adam’s 0.83 dB, demon-
+To account for the effects of random initialization and ensure        strating more consistent and dependable error cancellation
+statistical validity, each experiment was repeated 20 times with      performance.
+different random seeds.
+   The hyperparameter configurations for each algorithm are
+carefully selected based on standard practices and preliminary
+experiments to ensure a fair and robust comparison. We
+adjust all settings to ensure more accurate model estimations,
+minimizing the error (measured by MSE).
+   • Adam (Baseline): The Adam optimizer [30], a widely-
+      used gradient-based baseline, is configured with a learn-
+      ing rate α = 0.001, exponential decay rates β1 = 0.9
+      and β2 = 0.999, and ϵ = 10−8 , based on engineering
+      experience.
+   • FDEKF: Key tuning parameters are set based on physical
+      interpretations and empirical adjustments. The initial pa-
+      rameter error variances P0i are set to 0.01, onsistent with
+      the variance of the parameter initialization distribution.
+      The process noise variance Qik follows a dynamic sched-
+      ule: initially zero for 10 epochs to accelerate convergence,
+                                                                      Fig. 4. Power spectral density of the reference PIM signal and the residual
+      then increases to 10−6 to prevent Kalman gain vanishing,        signals after cancellation by FDEKF, RR-FDEKF, and Adam.
+      and subsequently decays by a factor of 0.7 every 50
+      epochs to a minimum of 10−12 . The measurement noise               Before evaluating practical computational efficiency, we an-
+      variance Rk is fixed at 10−8 , calculated from the inherent     alyze the theoretical complexity for our specific experimental
+      noise in the receiving channel.                                 case of a single-output system (q = 1). The FDEKF adopts a
+   • RR-FDEKF: For a direct and fair comparison, the RR-              parallel decoupling strategy, enabling independent updates of
+      FDEKF is configured with the same parameters as the             n parameters. This eliminates the expensive matrix operations
+                                                                                                                               Page 12 of 13
+
+
+
+
+                                                                                                                                                              8
+
+
+
+                                                              TABLE I
+ PIM C ANCELLATION P ERFORMANCE (R ESIDUAL PIM P OWER [ D B], M EAN ± S TD ) AFTER D IFFERENT E POCHS . O RIGINAL PIM LEVEL : ≈19.13 D B.
+
+                      Algorithm                         Residual PIM Power (dB) at Epoch (Mean ± Std)
+                                         5                25             50               100              200              400
+                      Adam          7.78 ± 0.33      7.52 ± 0.53   6.80 ± 0.52        5.82 ± 0.61      4.91 ± 0.86      4.77 ± 0.83
+                      FDEKF         7.16 ± 0.32      6.51 ± 0.18   5.74 ± 0.43        3.68 ± 0.29      2.71 ± 0.20      2.56 ± 0.19
+                      RR-FDEKF      7.20 ± 0.31      6.60 ± 0.20   6.20 ± 0.51        4.47 ± 0.65      3.06 ± 0.41      2.61 ± 0.25
+
+
+
+                                                                                                           V. C ONCLUSION
+                                                                                 Both the FDEKF and the proposed RR-FDEKF have the
+                                                                              virtue of being able to interpret the Kalman gain as a
+                                                                              mechanism-clear adaptive learning rate. They offer an alterna-
+                                                                              tive with clear theoretical foundation to Adam, a heuristic but
+                                                                              highly recognized optimizer in deep learning research field.
+                                                                              In digital PIM cancellation, an advanced technique in wire-
+                                                                              less communication, our results confirm that both algorithms
+                                                                              achieve better cancellation performance and faster convergence
+                                                                              than Adam. Specifically, the RR-FDEKF’s sequential, single-
+                                                                              parameter update scheme is well-suited for high-data-rate sce-
+                                                                              narios with numerous parameters, ensuring high computational
+                                                                              efficiency. These findings provide strong evidence for the
+                                                                              capability of this class of algorithms, and particularly highlight
+                                                                              the considerable potential of the proposed RR-FDEKF for the
+Fig. 5. Residual power (dB) versus training epoch for FDEKF, RR-FDEKF,
+                                                                              online identification of complex dynamic systems.
+and Adam on the PIM cancellation.
+                                                                                                             R EFERENCES
+                                                                               [1] L. Ljung, “Perspectives on system identification,” Annual Reviews in
+of the standard EKF, reducing computational complexity to                          Control, vol. 34, no. 1, pp. 1–12, 2010.
+O(n). Likewise, the RR-FDEKF employs a Round-Robin                             [2] T. Söderström, P. Stoica, and B. Friedlander, “An indirect prediction
+decoupling method, sequentially updating parameters within                         error method for system identification,” Automatica, vol. 27, no. 1, pp.
+                                                                                   183–188, 1991.
+a single data cycle. This sequential approach also achieves                    [3] M. Z. Waheed, D. Korpi, L. Anttila, A. Kiayani, M. Kosunen, K. Stadius,
+O(n) complexity. By immediately incorporating information                          P. P. Campo, M. Turunen, M. Allén, J. Ryynänen et al., “Passive
+from one parameter’s update into the next, the RR-FDEKF is                         intermodulation in simultaneous transmit–receive systems: Modeling
+                                                                                   and digital cancellation methods,” IEEE Transactions on Microwave
+well-suited for low-latency and online applications.                               Theory and Techniques, vol. 68, no. 9, pp. 3633–3652, 2020.
+                                                                               [4] J. R. Wilkerson, I. M. Kilgore, K. G. Gard, and M. B. Steer, “Passive
+                                                                                   intermodulation distortion in antennas,” IEEE Transactions on Antennas
+                            TABLE II                                               and Propagation, vol. 63, no. 2, pp. 474–482, 2014.
+              AVERAGE E XECUTION T IME PER E POCH ( S )                        [5] F. Mkadem and S. Boumaiza, “Physically inspired neural network model
+                                                                                   for rf power amplifier behavioral modeling and digital predistortion,”
+               Algorithm     Average Execution Time (s)                            IEEE Transactions on Microwave Theory and Techniques, vol. 59, no. 4,
+                                                                                   pp. 913–923, 2011.
+               Adam               70.9513 ± 4.1053
+                                                                               [6] D. R. Morgan, Z. Ma, J. Kim, M. G. Zierdt, and J. Pastalan, “A
+               FDEKF              70.7753 ± 3.0392
+                                                                                   generalized memory polynomial model for digital predistortion of rf
+               RR-FDEKF           60.7785 ± 7.4055
+                                                                                   power amplifiers,” IEEE Transactions on signal processing, vol. 54,
+                                                                                   no. 10, pp. 3852–3860, 2006.
+                                                                               [7] V. G. Asutkar, B. M. Patre, and T. Basu, “Kalman filter approach for
+   The execution times in Table II confirm the computational                       identification of linear fast time-varying processes,” in 2009 Interna-
+efficiency of the proposed designs. The FDEKF achieves a run-                      tional Conference on Control, Automation, Communication and Energy
+                                                                                   Conservation. IEEE, 2009, pp. 1–5.
+time comparable to the highly optimized Adam baseline, while                   [8] S. Deepak, R. Aiswarya, C. Aparna, and J. J. Nair, “Optimization of
+the RR-FDEKF demonstrates a notable advantage, proving to                          gaussian membership functions using unscented kalman filter,” in 2018
+be the most efficient method. Notably, RR-FDEKF proves                             International Conference on Advances in Computing, Communications
+                                                                                   and Informatics (ICACCI). IEEE, 2018, pp. 957–961.
+to be the most efficient, requiring only 60.78 s per epoch.                    [9] M. Q. Phan, F. Vicario, R. W. Longman, and R. Betti, “State-space model
+This reflects a 1.16x speedup compared to FDEKF, which                             and kalman filter gain identification by a kalman filter of a kalman filter,”
+takes 70.78 s per epoch, highlighting RR-FDEKF’s enhanced                          Journal of Dynamic Systems, Measurement, and Control, vol. 140, no. 3,
+                                                                                   p. 030902, 2018.
+efficiency due to its sequential update structure. This empirical             [10] X. Sun, L. Jin, and M. Xiong, “Extended kalman filter for estimation of
+performance advantage, combined with RR-FDEKF’s archi-                             parameters in nonlinear state-space models of biochemical networks,”
+tectural suitability for pipelined processing, underscores its                     PloS one, vol. 3, no. 11, p. e3758, 2008.
+                                                                              [11] P. Maybeck, J. Negro, S. Cusumano, and M. DePonte, “A new tracker
+implementation advantages for computationally intensive real-                      for air-to-air missile targets,” IEEE Transactions on Automatic Control,
+time applications.                                                                 vol. 24, no. 6, pp. 900–905, 1979.
+                                                                                  Page 13 of 13
+
+
+
+
+                                                                                                  9
+
+
+
+[12] D. Simon, Optimal state estimation: Kalman, H infinity, and nonlinear
+     approaches. John Wiley & Sons, 2006.
+[13] Y. Wang, Y. Li, and Z. Zhao, “State parameter estimation of intelligent
+     vehicles based on an adaptive unscented kalman filter,” Electronics,
+     vol. 12, no. 6, p. 1500, 2023.
+[14] T. Yoshimura, K. Konishi, and T. Soeda, “A modified extended kalman
+     filter for linear discrete-time systems with unknown parameters,” Auto-
+     matica, vol. 17, no. 4, pp. 657–660, 1981.
+[15] A. P. Sage, J. L. Melsa, and W. Steinway, “Estimation theory with
+     applications to communication and control,” IEEE Transactions on
+     Systems, Man, and Cybernetics, no. 4, pp. 405–405, 1971.
+[16] S. Sinha and T. Nagaraja, “Extended kalman filter algorithm for
+     continuous system parameter identification,” Computers & electrical
+     engineering, vol. 16, no. 1, pp. 51–64, 1990.
+[17] M. Mansouri, H. Tolouei, and M. A. Shoorehdeli, “Identification of
+     hammerstein-wiener armax systems using extended kalman filter,” in
+     2011 Chinese Control and Decision Conference (CCDC). IEEE, 2011,
+     pp. 1110–1114.
+[18] D. Li and Y. Wang, “Parameter identification of a differentiable bouc-
+     wen model using constrained extended kalman filter,” Structural Health
+     Monitoring, vol. 20, no. 1, pp. 360–378, 2021.
+[19] M. Gautier and P. Poignet, “Extended kalman filtering and weighted least
+     squares dynamic identification of robot,” Control Engineering Practice,
+     vol. 9, no. 12, pp. 1361–1372, 2001.
+[20] X. Wang, J. Li, S. Chen, G. Zhang, B. Jiang, X. Wei, and H. Dai,
+     “Online detection of lithium plating onset for lithium-ion batteries based
+     on impedance changing trend identification during charging processes,”
+     IEEE Transactions on Transportation Electrification, vol. 9, no. 2, pp.
+     3487–3497, 2022.
+[21] A. Gaytan, O. Begovich-Mendoza, and N. Arana-Daniel, “Training
+     of convolutional neural networks for image classification with fully
+     decoupled extended kalman filter,” Algorithms, vol. 17, no. 6, p. 243,
+     2024.
+[22] H. Jaeger, Tutorial on training recurrent neural networks, covering
+     BPPT, RTRL, EKF and the echo state network approach. Citeseer,
+     2002, vol. 5, no. 1.
+[23] S. Kollias and D. Anastassiou, “An adaptive least squares algorithm for
+     the efficient training of artificial neural networks,” IEEE Transactions
+     on Circuits and Systems, vol. 36, no. 8, pp. 1092–1101, 1989.
+[24] S. Shah and F. Palmieri, “Meka-a fast, local algorithm for training feed-
+     forward neural networks,” in 1990 IJCNN International Joint Conference
+     on Neural Networks. IEEE, 1990, pp. 41–46.
+[25] G. V. Puskorius and L. A. Feldkamp, “Decoupled extended kalman
+     filter training of feedforward layered networks,” in IJCNN-91-Seattle
+     International Joint Conference on Neural Networks, vol. 1. IEEE,
+     1991, pp. 771–777.
+[26] M. Ciołek, M. Niedźwiecki, and A. Gańcza, “Decoupled kalman filter
+     based identification of time-varying fir systems,” IEEE Access, vol. 9,
+     pp. 74 622–74 631, 2021.
+[27] Z. Youmin, P. Quan, Z. Hongcai, and D. Guanzhong, “A parallel decou-
+     pled kalman filtering algorithm and systolic architecture,” in Proceedings
+     of 32nd IEEE Conference on Decision and Control. IEEE, 1993, pp.
+     3590–3595.
+[28] S. S. Haykin, Adaptive filter theory. Pearson Education India, 2002.
+[29] B. Widrow, J. R. Glover, J. M. McCool, J. Kaunitz, C. S. Williams,
+     R. H. Hearn, J. R. Zeidler, J. E. Dong, and R. C. Goodlin, “Adaptive
+     noise cancelling: Principles and applications,” Proceedings of the IEEE,
+     vol. 63, no. 12, pp. 1692–1716, 1975.
+[30] D. P. Kingma and J. Ba, “Adam: A method for stochastic optimization,”
+     arXiv preprint arXiv:1412.6980, 2014.
+[31] I. Goodfellow, Y. Bengio, A. Courville, and Y. Bengio, Deep learning.
+     MIT press Cambridge, 2016, vol. 1, no. 2.
+[32] C. Liu and Z. Yan, “Symmetrized Basis Function Approximation Net-
+     work for Passive Intermodulation Cancellation,” IEEE Transactions on
+     Communications, 2025, doi:10.1109/TCOMM.2025.3560338.
+
