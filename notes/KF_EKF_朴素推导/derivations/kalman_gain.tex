@@ -1,7 +1,7 @@
 \documentclass[12pt,a4paper]{ctexart}
 \input{../preamble.tex}
 
-\title{细节推导：Kalman 增益为什么是这个公式}
+\title{细节推导：Kalman 增益如何从创新里长出来}
 \author{}
 \date{\today}
 
@@ -11,114 +11,244 @@
 
 \section{目标}
 
-我们要解释三件事：
-\begin{enumerate}
-  \item 更新后误差为什么会长成
-  \((\bm{I}-\bm{K}_t\bm{H})\bm{e}_{t|t-1}-\bm{K}_t\bm{v}_t\)；
-  \item 为什么最优增益是
-  \(\bm{K}_t=\bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}\)；
-  \item 为什么很多教材还能把协方差写成更短的
-  \((\bm{I}-\bm{K}_t\bm{H})\bm{P}_{t|t-1}\)。
-\end{enumerate}
+这一份细节推导只解决一件事：
 
-\section{先把来龙去脉摆平}
-
-这份推导不是从“状态空间模型”直接跳到
-\[
-\bm{K}_t = \bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}.
-\]
-
-中间其实隔着四层逻辑：
-\begin{enumerate}
-  \item 先预测出状态均值
-  \(\hat{\bm{x}}_{t|t-1}\)
-  和预测协方差
-  \(\bm{P}_{t|t-1}\)；
-  \item 新观测到来后，先决定“更新族”长什么样，也就是
-  \[
-  \hat{\bm{x}}_{t|t}
-  = \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t;
-  \]
-  \item 一旦更新族固定，唯一还没定的只剩
-  \(\bm{K}_t\)；
-  \item 所以真正的问题变成：\textbf{在所有可能的
-  \(\bm{K}_t\)
-  里，哪一个会让更新后的不确定性最小？}
-\end{enumerate}
-
-换句话说，
-\(\bm{K}_t\)
-不是拍脑袋写出来的，也不是从状态方程里直接读出来的；它是\textbf{先固定更新结构，再做最优化}得到的。
-
-\section{先把更新后误差写出来}
-
-\proofstep{enter}{从更新公式开始：}
-
+\begin{quote}
+既然更新结构已经定成
 \[
 \hat{\bm{x}}_{t|t}
-= \hat{\bm{x}}_{t|t-1} + \bm{K}_t(\bm{y}_t - \bm{H}\hat{\bm{x}}_{t|t-1}).
+= \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t,
 \]
+那么
+\(\bm{K}_t\)
+为什么会等于
+\[
+\bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}?
+\]
+\end{quote}
 
-\proofstep{rw}{定义更新后误差
-\(\bm{e}_{t|t} = \bm{x}_t - \hat{\bm{x}}_{t|t}\)，
-直接代入。}
+核心思路不是先写 Joseph 形式，而是顺着下面这条链走：
+\begin{enumerate}
+  \item 先看创新
+  \(\tilde{\bm{y}}_t\)
+  里到底混了什么；
+  \item 再定义创新自己的不确定性
+  \(\bm{S}_t\)；
+  \item 再看状态误差和创新的互协方差；
+  \item 最后用“更新后误差不该再和创新相关”这一条朴素要求，把
+  \(\bm{K}_t\)
+  解出来。
+\end{enumerate}
+
+\section{第一步：创新并不等于真相，它是两部分的混合}
+
+\proofstep{enter}{从创新定义开始：}
 
 \[
-\bm{e}_{t|t}
-= \bm{x}_t - \hat{\bm{x}}_{t|t-1} - \bm{K}_t(\bm{y}_t - \bm{H}\hat{\bm{x}}_{t|t-1}).
+\tilde{\bm{y}}_t
+= \bm{y}_t - \hat{\bm{y}}_{t|t-1}.
 \]
 
-\proofstep{rw}{再代入观测方程
-\(\bm{y}_t = \bm{H}\bm{x}_t + \bm{v}_t\)，
-并把
+\proofstep{rw}{代入观测方程
+\(\bm{y}_t = \bm{H}\bm{x}_t + \bm{v}_t\)
+和预测观测
+\(\hat{\bm{y}}_{t|t-1}=\bm{H}\hat{\bm{x}}_{t|t-1}\)：}
+
+\[
+\tilde{\bm{y}}_t
+= \bm{H}\bm{x}_t + \bm{v}_t - \bm{H}\hat{\bm{x}}_{t|t-1}.
+\]
+
+\proofstep{rw}{把
 \(\bm{x}_t - \hat{\bm{x}}_{t|t-1}\)
 认成预测误差
-\(\bm{e}_{t|t-1}\)。}
+\(\bm{e}_{t|t-1}\)：}
 
 \[
-\bm{e}_{t|t}
-= (\bm{I} - \bm{K}_t\bm{H})\bm{e}_{t|t-1} - \bm{K}_t\bm{v}_t.
+\tilde{\bm{y}}_t
+= \bm{H}\bm{e}_{t|t-1} + \bm{v}_t.
 \]
 
-\section{Joseph 形式从哪里来}
+\proofstep{done}{所以创新不是“完整的状态误差”，而是“传感器能看见的那部分状态误差”再混上“这一拍的测量噪声”。例如
+\(\bm{H}=[1\ 0]\)
+时，传感器只直接看见位置误差，看不见速度误差。}
 
-\proofstep{enter}{定义后验协方差：}
+\section{第二步：先算创新自己的协方差 \texorpdfstring{$\bm{S}_t$}{S_t}}
+
+\proofstep{enter}{定义创新协方差：}
 
 \[
-\bm{P}_{t|t}
-= \mathbb{E}[\bm{e}_{t|t}\bm{e}_{t|t}^\top].
+\bm{S}_t
+= \mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top].
 \]
 
-\proofstep{rw}{把刚才得到的误差公式代进去。令
-\(\bm{A}=\bm{I}-\bm{K}_t\bm{H}\)，
-则}
+\proofstep{rw}{把
+\(\tilde{\bm{y}}_t=\bm{H}\bm{e}_{t|t-1}+\bm{v}_t\)
+代进去：}
 
 \[
-\bm{e}_{t|t} = \bm{A}\bm{e}_{t|t-1} - \bm{K}_t\bm{v}_t.
+\bm{S}_t
+= \mathbb{E}\bigl[(\bm{H}\bm{e}_{t|t-1}+\bm{v}_t)(\bm{H}\bm{e}_{t|t-1}+\bm{v}_t)^\top\bigr].
 \]
 
-\proofstep{rw}{展开
-\((a-b)(a-b)^\top\)：}
+\proofstep{rw}{按
+\((a+b)(a+b)^\top\)
+展开：}
 
 \[
 \begin{aligned}
-\bm{P}_{t|t}
-=\;& \mathbb{E}[\bm{A}\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top\bm{A}^\top] \\
-&- \mathbb{E}[\bm{A}\bm{e}_{t|t-1}\bm{v}_t^\top\bm{K}_t^\top] \\
-&- \mathbb{E}[\bm{K}_t\bm{v}_t\bm{e}_{t|t-1}^\top\bm{A}^\top] \\
-&+ \mathbb{E}[\bm{K}_t\bm{v}_t\bm{v}_t^\top\bm{K}_t^\top].
+\bm{S}_t
+=\;&
+\mathbb{E}[\bm{H}\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top\bm{H}^\top] \\
+&+ \mathbb{E}[\bm{H}\bm{e}_{t|t-1}\bm{v}_t^\top] \\
+&+ \mathbb{E}[\bm{v}_t\bm{e}_{t|t-1}^\top\bm{H}^\top] \\
+&+ \mathbb{E}[\bm{v}_t\bm{v}_t^\top].
 \end{aligned}
 \]
 
-\proofstep{have}{如果默认预测误差
+\proofstep{have}{默认预测误差
 \(\bm{e}_{t|t-1}\)
-和当前观测噪声
+和当前测量噪声
 \(\bm{v}_t\)
 独立，而且
 \(\mathbb{E}[\bm{v}_t]=\bm{0}\)，
-那么两个交叉项都会是 0。}
+所以中间两个交叉项为 0。}
 
-\proofstep{done}{于是得到 Joseph 形式：}
+\proofstep{rw}{再用
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top] = \bm{P}_{t|t-1},
+\qquad
+\mathbb{E}[\bm{v}_t\bm{v}_t^\top] = \bm{R},
+\]
+就得到：}
+
+\[
+\bm{S}_t
+= \bm{H}\bm{P}_{t|t-1}\bm{H}^\top + \bm{R}.
+\]
+
+\proofstep{done}{所以
+\(\bm{S}_t\)
+衡量的是“这一拍创新本身有多不确定”，而不是“状态有多不确定”。}
+
+\section{第三步：再算状态误差和创新的互协方差}
+
+\proofstep{enter}{我们关心的是}
+
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top].
+\]
+
+\proofstep{rw}{把
+\(\tilde{\bm{y}}_t=\bm{H}\bm{e}_{t|t-1}+\bm{v}_t\)
+代进去：}
+
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
+= \mathbb{E}[\bm{e}_{t|t-1}(\bm{H}\bm{e}_{t|t-1}+\bm{v}_t)^\top].
+\]
+
+\proofstep{rw}{展开：}
+
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
+= \mathbb{E}[\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top]\bm{H}^\top
++ \mathbb{E}[\bm{e}_{t|t-1}\bm{v}_t^\top].
+\]
+
+\proofstep{rw}{第二项依然因为独立和零均值而为 0，于是}
+
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
+= \bm{P}_{t|t-1}\bm{H}^\top.
+\]
+
+\proofstep{done}{这条式子在直觉上很重要：如果某个状态方向和创新根本不相关，那创新就没有理由去修它。}
+
+\section{第四步：用“更新后误差不该再和创新相关”解出 \texorpdfstring{$\bm{K}_t$}{K_t}}
+
+\proofstep{enter}{更新结构已经固定成}
+
+\[
+\hat{\bm{x}}_{t|t}
+= \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t.
+\]
+
+\proofstep{rw}{所以更新后误差就是}
+
+\[
+\bm{e}_{t|t}
+= \bm{x}_t - \hat{\bm{x}}_{t|t}
+= \bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t.
+\]
+
+\proofstep{have}{现在用一个很朴素的最优性要求：既然创新
+\(\tilde{\bm{y}}_t\)
+已经被用来修正状态了，那么更新后剩下的误差
+\(\bm{e}_{t|t}\)
+就不该再和创新有系统相关。否则就说明创新里还有没榨干的信息。}
+
+\[
+\mathbb{E}[\bm{e}_{t|t}\tilde{\bm{y}}_t^\top] = \bm{0}.
+\]
+
+\proofstep{rw}{把
+\(\bm{e}_{t|t}=\bm{e}_{t|t-1}-\bm{K}_t\tilde{\bm{y}}_t\)
+代进去：}
+
+\[
+\mathbb{E}[(\bm{e}_{t|t-1}-\bm{K}_t\tilde{\bm{y}}_t)\tilde{\bm{y}}_t^\top] = \bm{0}.
+\]
+
+\proofstep{rw}{展开期望：}
+
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
+- \bm{K}_t\mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top]
+= \bm{0}.
+\]
+
+\proofstep{rw}{把上一节算出来的两个量代进去：}
+
+\[
+\bm{P}_{t|t-1}\bm{H}^\top - \bm{K}_t\bm{S}_t = \bm{0}.
+\]
+
+\proofstep{done}{右乘
+\(\bm{S}_t^{-1}\)
+就得到}
+
+\[
+\bm{K}_t
+= \bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}.
+\]
+
+\section{一句话理解这条公式}
+
+\[
+\bm{K}_t
+=
+\underbrace{\bm{P}_{t|t-1}\bm{H}^\top}_{\text{创新对状态误差有多有用}}
+\underbrace{\bm{S}_t^{-1}}_{\text{创新自己有多可靠}}
+\]
+
+它其实就是多维版的“线性回归系数”。一维时更明显：
+\[
+K_t
+= \frac{\mathrm{Cov}(e_{t|t-1},\tilde{y}_t)}{\mathrm{Var}(\tilde{y}_t)}.
+\]
+
+所以 Kalman 增益不是神秘公式，而是在回答：
+
+\begin{quote}
+这次残差到底有多值得信，以及该把它分配到哪些状态方向上。
+\end{quote}
+
+\section{工程尾注：如果还要更新协方差}
+
+\proofstep{have}{思想上，前面的推导已经够了。}
+
+\proofstep{rw}{如果实现里还要更新后验协方差，一个常用的数值稳定写法是}
 
 \[
 \bm{P}_{t|t}
@@ -126,125 +256,8 @@
 + \bm{K}_t\bm{R}\bm{K}_t^\top.
 \]
 
-\section{目标变成：选一个让后验不确定性最小的 \texorpdfstring{$\bm{K}_t$}{K_t}}
-
-最常见目标是让
-\(\mathrm{tr}(\bm{P}_{t|t})\)
-最小。
-
-\proofstep{rw}{这一步的朴素含义是：我们已经接受“更新公式必须长成旧预测加一项修正”的结构，现在只剩“这项修正到底该开多大”没定。既然
-\(\bm{P}_{t|t}\)
-描述的是更新后还剩多少不确定性，那么最自然的目标就是把它压到尽量小。}
-
-\proofstep{rw}{先把 Joseph 形式展开：}
-
-\[
-\bm{P}_{t|t}
-= \bm{P}_{t|t-1}
-- \bm{K}_t\bm{H}\bm{P}_{t|t-1}
-- \bm{P}_{t|t-1}\bm{H}^\top\bm{K}_t^\top
-+ \bm{K}_t(\bm{H}\bm{P}_{t|t-1}\bm{H}^\top + \bm{R})\bm{K}_t^\top.
-\]
-
-\proofstep{have}{把
-\[
-\bm{S}_t = \bm{H}\bm{P}_{t|t-1}\bm{H}^\top + \bm{R}
-\]
-记成创新协方差。这样式子会短很多：}
-
-\[
-\bm{P}_{t|t}
-= \bm{P}_{t|t-1}
-- \bm{K}_t\bm{H}\bm{P}_{t|t-1}
-- \bm{P}_{t|t-1}\bm{H}^\top\bm{K}_t^\top
-+ \bm{K}_t\bm{S}_t\bm{K}_t^\top.
-\]
-
-\section{不用矩阵求导，也能看出最优 \texorpdfstring{$\bm{K}_t$}{K_t}}
-
-\proofstep{have}{先猜一个候选最优值：}
-
-\[
-\bm{K}_t^\star = \bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}.
-\]
-
-\proofstep{rw}{下面不是直接求导，而是把上式配方成“平方项 + 常数项”的样子。注意到}
-
-\[
-\bm{K}_t\bm{S}_t\bm{K}_t^\top
-- \bm{K}_t\bm{H}\bm{P}_{t|t-1}
-- \bm{P}_{t|t-1}\bm{H}^\top\bm{K}_t^\top
-\]
-
-可以重写成
-\[
-(\bm{K}_t-\bm{K}_t^\star)\bm{S}_t(\bm{K}_t-\bm{K}_t^\star)^\top
-- \bm{K}_t^\star\bm{S}_t(\bm{K}_t^\star)^\top.
-\]
-
-\proofstep{rw}{把
-\(\bm{K}_t^\star=\bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}\)
-代回去，得到：}
-
-\[
-\bm{P}_{t|t}
-= \bm{P}_{t|t-1}
-- \bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}\bm{H}\bm{P}_{t|t-1}
-+ (\bm{K}_t-\bm{K}_t^\star)\bm{S}_t(\bm{K}_t-\bm{K}_t^\star)^\top.
-\]
-
-\proofstep{done}{最后一项是一个半正定矩阵，所以它的迹不可能是负的。要让
-\(\mathrm{tr}(\bm{P}_{t|t})\)
-最小，唯一办法就是让这项直接变成 0。}
-
-因此最优解就是
-\[
-\bm{K}_t = \bm{K}_t^\star
-= \bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}.
-\]
-
-\section{为什么教材里又会出现更短的协方差更新}
-
-\proofstep{have}{最优增益满足一个很有用的恒等式：}
-
-\[
-\bm{K}_t\bm{S}_t
-= \bm{P}_{t|t-1}\bm{H}^\top.
-\]
-
-\proofstep{rw}{把它左乘
-\(\bm{K}_t^\top\)
-或直接放回展开式里，就能把最后两个项合并掉。于是}
-
-\[
-\begin{aligned}
-\bm{P}_{t|t}
-=\;& \bm{P}_{t|t-1}
-- \bm{K}_t\bm{H}\bm{P}_{t|t-1}
-- \bm{P}_{t|t-1}\bm{H}^\top\bm{K}_t^\top
-+ \bm{K}_t\bm{S}_t\bm{K}_t^\top \\
-=\;& \bm{P}_{t|t-1}
-- \bm{K}_t\bm{H}\bm{P}_{t|t-1}.
-\end{aligned}
-\]
-
-这就是很多教材爱写的短公式：
-\[
-\bm{P}_{t|t} = (\bm{I}-\bm{K}_t\bm{H})\bm{P}_{t|t-1}.
-\]
-
-\proofstep{done}{但实现时依然推荐 Joseph 形式，因为它对浮点误差更稳，更不容易把协方差算坏。}
-
-\paragraph{一句话总结}
-\begin{itemize}
-  \item 更新结构决定了
-  \(\bm{K}_t\)
-  是“残差 \(\to\) 状态修正”的线性映射；
-  \item 最优性要求把后验协方差尽量压小；
-  \item 一配方，就能直接看出最优
-  \(\bm{K}_t\)
-  必须是
-  \(\bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}\)。
-\end{itemize}
+\proofstep{done}{这叫 Joseph 形式。它的角色主要是工程稳健性，不是理解
+\(\bm{K}_t\)
+公式来龙去脉的主线。}
 
 \end{document}

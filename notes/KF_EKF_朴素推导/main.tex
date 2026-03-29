@@ -553,113 +553,241 @@ k_v
 
 但这时
 \(\bm{K}_t\)
-还完全没定。也就是说，\textbf{更新结构已经确定了，可“到底修多大”还没确定。}
+还完全没定。也就是说，\textbf{更新结构已经确定了，但“这次残差到底该信多少”还没定。}
 
-所以这一节不是从状态空间模型直接跳到
-\(\bm{K}_t\)
-公式，而是顺着下面这条链往下走：
+这一节真正要回答的，不是一个纯代数问题，而是三个很朴素的问题：
 \begin{enumerate}
-  \item 先固定更新结构；
-  \item 把更新后误差写成
-  \(\bm{K}_t\)
-  的函数；
-  \item 再把更新后协方差写成
-  \(\bm{K}_t\)
-  的函数；
-  \item 最后选一个让后验不确定性最小的
-  \(\bm{K}_t\)。
+  \item 这次残差
+  \(\tilde{\bm{y}}_t\)
+  里，哪些部分真的是“预测错了”；
+  \item 哪些部分只是“传感器自己在抖”；
+  \item 最后应该把这份残差按多大比例翻译成状态修正量。
 \end{enumerate}
 
-更新后误差满足：
+\paragraph{第一步：先把创新拆开看，它并不等于“真相”}
 
+由观测方程
 \[
-\bm{e}_{t|t}
-= \bm{x}_t - \hat{\bm{x}}_{t|t}
-= \bm{x}_t - \hat{\bm{x}}_{t|t-1} - \bm{K}_t(\bm{y}_t - \bm{H}\hat{\bm{x}}_{t|t-1}).
+\bm{y}_t = \bm{H}\bm{x}_t + \bm{v}_t
 \]
-
-因为
+和预测观测
 \[
-\bm{y}_t = \bm{H}\bm{x}_t + \bm{v}_t,
+\hat{\bm{y}}_{t|t-1} = \bm{H}\hat{\bm{x}}_{t|t-1}
 \]
 可得
 \[
+\tilde{\bm{y}}_t
+= \bm{y}_t - \hat{\bm{y}}_{t|t-1}
+= \bm{H}(\bm{x}_t-\hat{\bm{x}}_{t|t-1}) + \bm{v}_t
+= \bm{H}\bm{e}_{t|t-1} + \bm{v}_t.
+\]
+
+这句式子非常关键。更直白地说：\textbf{传感器看到的，不是完整状态误差
+\(\bm{e}_{t|t-1}\)
+本身，而只是它“能看见的那一部分”，然后再混上一层测量噪声。}
+
+这里的
+\(\bm{H}\bm{e}_{t|t-1}\)
+就是“状态误差里被传感器看到的部分”。
+
+例如在小车例子里，
+\[
+\bm{x}_t =
+\begin{bmatrix}
+p_t\\
+v_t
+\end{bmatrix},
+\qquad
+\bm{H} =
+\begin{bmatrix}
+1 & 0
+\end{bmatrix},
+\]
+那么
+\[
+\bm{H}\bm{e}_{t|t-1}
+=
+\begin{bmatrix}
+1 & 0
+\end{bmatrix}
+\begin{bmatrix}
+\text{位置误差}\\
+\text{速度误差}
+\end{bmatrix}
+= \text{位置误差}.
+\]
+
+也就是说，这个传感器这一拍只能直接看见“位置到底差了多少”，看不见完整的二维状态误差；然后它给出的这份“位置残差”里，还会再掺上一层测量噪声
+\(\bm{v}_t\)。
+
+所以残差大，并不自动意味着应该大改口。它可能真的是预测错了很多，也可能只是这一拍传感器特别吵。
+
+\paragraph{第二步：于是自然会冒出一个新问题，这份残差本身有多不确定}
+
+既然创新
+\(\tilde{\bm{y}}_t\)
+本身就混着预测误差和测量噪声，那我们必须先衡量：\textbf{这一拍残差到底靠不靠谱。}
+
+最自然的量，就是它自己的协方差：
+\[
+\bm{S}_t
+= \mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top].
+\]
+
+把
+\(\tilde{\bm{y}}_t = \bm{H}\bm{e}_{t|t-1} + \bm{v}_t\)
+代进去，并利用预测误差与当前测量噪声独立、且测量噪声零均值，就得到
+\[
+\bm{S}_t
+= \bm{H}\bm{P}_{t|t-1}\bm{H}^\top + \bm{R}.
+\]
+
+这里的
+\(\bm{S}_t\)
+叫\textbf{创新协方差}。它描述的不是“状态有多不确定”，而是“这一拍残差本身有多不确定”。
+
+如果
+\(\bm{S}_t\)
+很大，你就该先警惕一下：这次残差里可能掺了很多噪声，不能一股脑全信。
+
+\paragraph{第三步：还要问，这份残差到底对哪些状态方向有用}
+
+不是每个状态维度都应该对残差做出同样反应。真正重要的是：\textbf{预测误差和创新之间到底有多相关。}
+
+最自然的量，就是二者的互协方差：
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top].
+\]
+
+把
+\(\tilde{\bm{y}}_t = \bm{H}\bm{e}_{t|t-1} + \bm{v}_t\)
+代入：
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
+= \mathbb{E}[\bm{e}_{t|t-1}(\bm{H}\bm{e}_{t|t-1}+\bm{v}_t)^\top].
+\]
+
+再展开：
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
+= \mathbb{E}[\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top]\bm{H}^\top
++ \mathbb{E}[\bm{e}_{t|t-1}\bm{v}_t^\top].
+\]
+
+由于预测误差和当前测量噪声独立，而且
+\(\mathbb{E}[\bm{v}_t]=\bm{0}\)，
+第二项为 0，所以
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
+= \bm{P}_{t|t-1}\bm{H}^\top.
+\]
+
+这条式子的意思是：\textbf{只有当某个状态方向和创新真的相关时，这份残差才有资格去修正那个状态方向。}
+
+\paragraph{第四步：最自然的线性修正，就是一个“回归系数矩阵”}
+
+上一节已经把更新结构固定成
+\[
+\hat{\bm{x}}_{t|t}
+= \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t.
+\]
+
+等价地，更新后误差满足
+\[
 \bm{e}_{t|t}
-= (\bm{I} - \bm{K}_t\bm{H})\bm{e}_{t|t-1} - \bm{K}_t\bm{v}_t.
+= \bm{x}_t - \hat{\bm{x}}_{t|t}
+= \bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t.
 \]
 
-如果默认预测误差和当前观测噪声独立，那么更新后协方差可以写成：
+现在最朴素的要求是：\textbf{既然你已经把创新
+\(\tilde{\bm{y}}_t\)
+用过一次了，那更新后剩下的误差就不该再和它有系统相关。}
+
+不然就说明这份创新里还有没榨干的信息，你还能继续改得更好。
+
+把这句话写成数学条件，就是
+\[
+\mathbb{E}[\bm{e}_{t|t}\tilde{\bm{y}}_t^\top] = \bm{0}.
+\]
+
+把
+\(\bm{e}_{t|t} = \bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t\)
+代进去：
+\[
+\mathbb{E}[(\bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t)\tilde{\bm{y}}_t^\top] = \bm{0}.
+\]
+
+展开后得到
+\[
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
+- \bm{K}_t\mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top]
+= \bm{0}.
+\]
+
+也就是
+\[
+\bm{K}_t
+= \mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
+\Bigl(\mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top]\Bigr)^{-1}.
+\]
+
+把前两步刚刚算出的两个量代进去：
+\[
+\bm{K}_t
+= \bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}.
+\]
+
+这就是 Kalman 增益公式。
+
+\paragraph{这条公式最朴素的读法}
 
 \[
-\bm{P}_{t|t}
-= (\bm{I} - \bm{K}_t\bm{H})\bm{P}_{t|t-1}(\bm{I} - \bm{K}_t\bm{H})^\top
-+ \bm{K}_t\bm{R}\bm{K}_t^\top.
+\bm{K}_t
+=
+\underbrace{\bm{P}_{t|t-1}\bm{H}^\top}_{\text{状态误差和创新有多相关}}
+\underbrace{\bm{S}_t^{-1}}_{\text{这份创新本身有多值得信}}
 \]
 
-这就是著名的 Joseph 形式。它非常重要，因为它数值上更稳定，也天然保持对称半正定。
-
-接下来的目标，就是选一个
-\(\bm{K}_t\)
-让后验协方差尽可能小。
-
-为什么优化的是后验协方差，而不是别的量？因为更新后真正留在你手里的，就是
-\(\hat{\bm{x}}_{t|t}\)
-和它对应的不确定性
-\(\bm{P}_{t|t}\)。
-均值负责回答“你现在猜多少”，协方差负责回答“你现在有多心虚”。所以自然目标就是：\textbf{在允许的线性更新族里，选一个让后验误差尽可能小的
-\(\bm{K}_t\)。}
-
-最后会得到：
-
-\[
-\bm{K}_t = \bm{P}_{t|t-1}\bm{H}^\top \bm{S}_t^{-1}.
-\]
-
-这里
-\[
-\bm{S}_t = \bm{H}\bm{P}_{t|t-1}\bm{H}^\top + \bm{R}
-\]
-叫创新协方差。它描述的不是“状态有多不确定”，而是“这一拍观测残差本身有多不确定”。
-
-\paragraph{这条公式最值得记住的直觉}
-
-\begin{itemize}
-  \item \(\bm{P}_{t|t-1}\) 大，说明我们对预测没把握，\(\bm{K}_t\) 会变大，更信观测；
-  \item \(\bm{R}\) 大，说明传感器很吵，\(\bm{S}_t\) 变大，\(\bm{K}_t\) 会变小，更信预测；
-  \item \(\bm{H}\) 决定了观测到底能看到状态的哪些方向。
-\end{itemize}
-
-很多教材还会把协方差更新写成更短的样子：
-
-\[
-\bm{P}_{t|t} = (\bm{I} - \bm{K}_t\bm{H})\bm{P}_{t|t-1}.
-\]
-
-它在最优
-\(\bm{K}_t\)
-下理论上成立，但实际代码里仍建议优先使用 Joseph 形式：
-
-\[
-\bm{P}_{t|t}
-= (\bm{I} - \bm{K}_t\bm{H})\bm{P}_{t|t-1}(\bm{I} - \bm{K}_t\bm{H})^\top
-+ \bm{K}_t\bm{R}\bm{K}_t^\top.
-\]
-
-原因很简单：浮点数世界不讲道理，简化式更容易把协方差算出非对称甚至非正定。
-
-如果你想看这两件事的细节：
-
-\begin{enumerate}
-  \item Joseph 形式怎么一步步推出来；
-  \item 为什么最优增益会是
-  \(\bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}\)；
-  \item 为什么代回后又能化成更短的协方差更新；
-\end{enumerate}
-
-见独立推导 PDF：
+所以它根本不神秘，本质上就是一句大白话：
 
 \begin{quote}
-\derivationpdflink{derivations/kalman_gain.pdf}{Kalman 增益与 Joseph 形式：逐步推导}
+先看这份残差对状态误差有没有用，再看这份残差自己靠不靠谱，最后决定修多大。
+\end{quote}
+
+在一维情形下，这条式子会直接退化成更熟悉的样子：
+\[
+K_t
+= \frac{\mathrm{Cov}(e_{t|t-1},\tilde{y}_t)}{\mathrm{Var}(\tilde{y}_t)}.
+\]
+
+它其实就是一个线性回归系数：
+\begin{itemize}
+  \item 分子大，说明创新和状态误差强相关，这份残差有用；
+  \item 分母大，说明创新本身很吵，这份残差不太可靠；
+  \item 二者一除，就得到“这次该修多大”。
+\end{itemize}
+
+\paragraph{补一句工程实现}
+
+到这里，Kalman 增益为什么长成这个公式，思想上已经结束了。
+
+如果你在代码里还要继续维护更新后的协方差，常用的数值稳定写法是
+\[
+\bm{P}_{t|t}
+= (\bm{I} - \bm{K}_t\bm{H})\bm{P}_{t|t-1}(\bm{I} - \bm{K}_t\bm{H})^\top
++ \bm{K}_t\bm{R}\bm{K}_t^\top.
+\]
+
+这叫 Joseph 形式。它是一个\textbf{实现层面的稳健写法}，不是理解
+\(\bm{K}_t\)
+来龙去脉的起点。
+
+如果你想看上面这条链怎么一行一行算清，包括
+\(\bm{S}_t\)
+怎么推出来、互协方差怎么推出来、以及 Joseph 形式为什么只是工程尾注，见：
+
+\begin{quote}
+\derivationpdflink{derivations/kalman_gain.pdf}{Kalman 增益：从创新相关性到最优修正}
 \end{quote}
 
 \subsection{KF 全流程汇总}
