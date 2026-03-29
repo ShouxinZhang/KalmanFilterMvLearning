@@ -1,0 +1,4 @@
+interface:
+  display_name: "TeX Lean 推导"
+  short_description: "把 TeX 公式推导改写成 Lean 风格的逐步重写。"
+  default_prompt: "使用 $tex-lean-derivation 把这段 TeX 公式推导改成 Lean 风格的逐步改写写法。"

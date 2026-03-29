@@ -1,0 +1,252 @@
+\documentclass[12pt,a4paper]{ctexart}
+\input{../preamble.tex}
+
+\title{细节推导：为什么更新结构长成 \texorpdfstring{$\hat{\bm{x}}_{t|t}=\hat{\bm{x}}_{t|t-1}+\bm{K}_t\tilde{\bm{y}}_t$}{xhat = xhat + K ytilde}}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{目标}
+
+我们想解释的不是一个“背下来的公式”，而是下面这条更新结构为什么几乎是被问题本身逼出来的：
+
+\[
+\hat{\bm{x}}_{t|t}
+= \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t,
+\qquad
+\tilde{\bm{y}}_t = \bm{y}_t - \hat{\bm{y}}_{t|t-1}.
+\]
+
+\section{先明确我们手里到底有什么}
+
+在更新这一步开始时，手里已经有两样东西：
+
+\begin{enumerate}
+  \item 预测状态
+  \(\hat{\bm{x}}_{t|t-1}\)；
+  \item 新观测带来的残差信息
+  \(\tilde{\bm{y}}_t\)。
+\end{enumerate}
+
+所以更新后的估计，本质上只能写成某个函数：
+\[
+\hat{\bm{x}}_{t|t} = \Phi(\hat{\bm{x}}_{t|t-1}, \bm{y}_t).
+\]
+
+\section{为什么要先把观测变成创新}
+
+\proofstep{rw}{观测值
+\(\bm{y}_t\)
+本身没有告诉你“这次到底新增了多少信息”。真正有用的是它和预测观测的差。}
+
+所以先定义
+\[
+\hat{\bm{y}}_{t|t-1},
+\qquad
+\tilde{\bm{y}}_t = \bm{y}_t - \hat{\bm{y}}_{t|t-1},
+\]
+再注意一个对新手很重要的点：到了时刻 \(t\) 的更新阶段，
+\(\hat{\bm{x}}_{t|t-1}\)
+已经是上一步算好的结果，所以
+\(\hat{\bm{y}}_{t|t-1}\)
+也是已知量。
+
+于是对这一拍来说，
+\(\bm{y}_t\)
+和
+\(\tilde{\bm{y}}_t\)
+是一一对应的：
+\[
+\tilde{\bm{y}}_t = \bm{y}_t - \hat{\bm{y}}_{t|t-1},
+\qquad
+\bm{y}_t = \tilde{\bm{y}}_t + \hat{\bm{y}}_{t|t-1}.
+\]
+
+\proofstep{rw}{所以把更新公式写成依赖
+\(\bm{y}_t\)
+还是依赖
+\(\tilde{\bm{y}}_t\)，
+并不会丢信息。只是创新更直接暴露了“观测相对预测新增了什么”。}
+
+因此
+再把更新公式改写成
+\[
+\hat{\bm{x}}_{t|t} = \Psi(\hat{\bm{x}}_{t|t-1}, \tilde{\bm{y}}_t).
+\]
+
+\section{为什么修正项要依赖创新}
+
+\proofstep{rw}{如果观测和预测完全一致，也就是
+\(\tilde{\bm{y}}_t=\bm{0}\)，
+那更新后就不应该乱动。}
+
+所以更新后的估计至少要满足：
+\[
+\tilde{\bm{y}}_t = \bm{0}
+\qquad\Longrightarrow\qquad
+\hat{\bm{x}}_{t|t} = \hat{\bm{x}}_{t|t-1}.
+\]
+
+\proofstep{rw}{反过来，如果残差越大，说明观测提供的新信息越强，修正幅度也应该越大。}
+
+这会把我们逼到一种更具体的形式：
+\[
+\hat{\bm{x}}_{t|t}
+= \hat{\bm{x}}_{t|t-1} + \bm{c}_t,
+\qquad
+\bm{c}_t = g(\tilde{\bm{y}}_t),
+\qquad
+g(\bm{0})=\bm{0}.
+\]
+
+\section{为什么又进一步写成线性形式}
+
+\proofstep{rw}{到这里为止，我们已经知道更新律可以看成“创新进去，更新后估计出来”的函数。由于在时刻
+\(t\)，
+\(\hat{\bm{x}}_{t|t-1}\)
+已经是已知量，所以可以把它吸收到函数记号里，写成}
+
+\[
+\hat{\bm{x}}_{t|t} = \varphi_t(\tilde{\bm{y}}_t).
+\]
+
+\proofstep{have}{而上一步已经给出一个关键边界条件：如果创新为 0，就不该改口。也就是说}
+
+\[
+\varphi_t(\bm{0}) = \hat{\bm{x}}_{t|t-1}.
+\]
+
+\proofstep{rw}{现在在
+\(\tilde{\bm{y}}_t=\bm{0}\)
+附近，对这个更新律做一阶线性展开：}
+
+\[
+\varphi_t(\tilde{\bm{y}}_t)
+\approx
+\varphi_t(\bm{0})
++
+\left.\frac{\partial \varphi_t}{\partial \tilde{\bm{y}}}\right|_{\tilde{\bm{y}}=\bm{0}}
+\tilde{\bm{y}}_t.
+\]
+
+\proofstep{rw}{把
+\(\varphi_t(\bm{0}) = \hat{\bm{x}}_{t|t-1}\)
+代回去，再把这个一阶导矩阵记作
+\(\bm{G}_t\)，
+就得到}
+
+\[
+\hat{\bm{x}}_{t|t}
+\approx
+\hat{\bm{x}}_{t|t-1} + \bm{G}_t\tilde{\bm{y}}_t.
+\]
+
+\proofstep{rw}{现在才把这个待定线性映射
+\(\bm{G}_t\)
+记作
+\(\bm{K}_t\)。}
+
+\[
+\hat{\bm{x}}_{t|t}
+= \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t.
+\]
+
+\proofstep{done}{这个视角和 EKF 很一致：都是先承认“真实更新律可能更一般”，再抓它在当前点附近最重要的一阶线性部分。区别只在于 KF 最后还能进一步证明：最优更新本来就落在线性族里。}
+
+\section{\texorpdfstring{$\bm{K}_t$}{K_t} 到底是什么}
+
+\proofstep{have}{先看维度。若状态是
+\(\bm{x}_t \in \mathbb{R}^n\)，
+观测是
+\(\bm{y}_t \in \mathbb{R}^m\)，
+那么创新也在
+\(\mathbb{R}^m\)
+里。为了让
+\(\bm{K}_t\tilde{\bm{y}}_t\)
+能加回
+\(\hat{\bm{x}}_{t|t-1}\)，
+\(\bm{K}_t\)
+必须是}
+
+\[
+\bm{K}_t \in \mathbb{R}^{n\times m}.
+\]
+
+\proofstep{rw}{这说明
+\(\bm{K}_t\)
+不是“一个比例”，而是一个矩阵。它负责把观测空间里的误差，翻译成状态空间里的修正。}
+
+\begin{quote}
+\(\bm{K}_t\) 的每一列，都表示“某一维观测残差应该如何分摊到各个状态维度上”。
+\end{quote}
+
+\section{放到小车例子里看}
+
+在主文档的小车例子里，
+\[
+\bm{x}_t =
+\begin{bmatrix}
+p_t\\
+v_t
+\end{bmatrix}
+\in \mathbb{R}^2,
+\qquad
+y_t \in \mathbb{R}.
+\]
+
+因为只测位置，观测维度是 1，所以
+\[
+\bm{K}_t =
+\begin{bmatrix}
+k_p\\
+k_v
+\end{bmatrix}
+\in \mathbb{R}^{2\times 1}.
+\]
+
+\proofstep{rw}{把它代回更新式，得到两条最有解释力的标量式：}
+
+\[
+\hat{p}_{t|t}
+= \hat{p}_{t|t-1} + k_p \tilde{y}_t,
+\qquad
+\hat{v}_{t|t}
+= \hat{v}_{t|t-1} + k_v \tilde{y}_t.
+\]
+
+\proofstep{done}{这两条式子揭示了
+\(\bm{K}_t\)
+最值得记住的含义：虽然传感器只直接看到了位置，但同一个位置残差，仍然可以顺带修正速度。}
+
+\section{再往前走一步：为什么不是别的复杂函数}
+
+当然，你也可以幻想更新式写成更复杂的样子，比如：
+\[
+\hat{\bm{x}}_{t|t}
+= \hat{\bm{x}}_{t|t-1} + g(\tilde{\bm{y}}_t),
+\]
+其中
+\(g\)
+是非线性的。
+
+但在线性高斯世界里，这样做没有必要：
+\begin{enumerate}
+  \item 问题本身是线性的；
+  \item 最优估计会落在线性更新族里；
+  \item 真正难的不是更新结构，而是\textbf{这个线性映射
+  \(\bm{K}_t\)
+  该取多大}。
+\end{enumerate}
+
+所以 4.3 的核心不是“把结构想复杂”，而是认清：
+\begin{quote}
+更新结构先天就该长成“旧预测 + 增益乘创新”。
+\end{quote}
+
+下一步真正要解决的问题，才是怎么选出最优的
+\(\bm{K}_t\)。
+
+\end{document}

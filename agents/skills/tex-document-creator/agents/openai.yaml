@@ -1,0 +1,4 @@
+interface:
+  display_name: "TeX 文档创建"
+  short_description: "创建或整理 TeX 文档，并分离 tex、pdf、build。"
+  default_prompt: "使用 $tex-document-creator 创建或整理一个 TeX 文档，并把 tex、pdf、build 分开。"

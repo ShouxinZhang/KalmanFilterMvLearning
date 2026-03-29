@@ -1,0 +1,162 @@
+\documentclass[12pt,a4paper]{ctexart}
+\input{../preamble.tex}
+
+\title{细节推导：误差协方差怎么预测}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{目标}
+
+我们要证明：
+\[
+\bm{P}_{t|t-1}
+= \bm{F}\bm{P}_{t-1|t-1}\bm{F}^\top + \bm{Q}.
+\]
+
+其中
+\[
+\bm{P}_{t|t-1}
+= \mathbb{E}[\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top],
+\qquad
+\bm{e}_{t|t-1} = \bm{x}_t - \hat{\bm{x}}_{t|t-1}.
+\]
+
+\section{先把误差递推式写出来}
+
+\proofstep{enter}{从状态方程和预测均值公式出发：}
+
+\[
+\bm{x}_t = \bm{F}\bm{x}_{t-1} + \bm{w}_t,
+\qquad
+\hat{\bm{x}}_{t|t-1} = \bm{F}\hat{\bm{x}}_{t-1|t-1}.
+\]
+
+\proofstep{rw}{两式相减，得到预测误差如何由上一拍误差和当前过程噪声组成。}
+
+\[
+\bm{e}_{t|t-1}
+= \bm{x}_t - \hat{\bm{x}}_{t|t-1}
+= \bm{F}\bm{e}_{t-1|t-1} + \bm{w}_t.
+\]
+
+\section{把它代回协方差定义}
+
+\proofstep{enter}{代入
+\(\bm{P}_{t|t-1} = \mathbb{E}[\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top]\)。}
+
+\[
+\bm{P}_{t|t-1}
+= \mathbb{E}\big[
+(\eqfocusa{\bm{F}\bm{e}_{t-1|t-1}} + \eqfocusb{\bm{w}_t})
+(\eqfocusa{\bm{F}\bm{e}_{t-1|t-1}} + \eqfocusb{\bm{w}_t})^\top
+\big].
+\]
+
+\proofstep{rw}{按
+\((a+b)(a+b)^\top\)
+展开。蓝色是旧误差传播项，青色是过程噪声项，橙色是交叉项。}
+
+\[
+\begin{aligned}
+\bm{P}_{t|t-1}
+\;=\;& \mathbb{E}\big[\eqfocusa{\bm{F}\bm{e}_{t-1|t-1}\bm{e}_{t-1|t-1}^\top\bm{F}^\top}\big] \\
+&+ \mathbb{E}\big[\eqfocusc{\bm{F}\bm{e}_{t-1|t-1}\bm{w}_t^\top}\big] \\
+&+ \mathbb{E}\big[\eqfocusc{\bm{w}_t\bm{e}_{t-1|t-1}^\top\bm{F}^\top}\big] \\
+&+ \mathbb{E}\big[\eqfocusb{\bm{w}_t\bm{w}_t^\top}\big].
+\end{aligned}
+\]
+
+\section{逐项处理}
+
+\proofstep{rw}{先看蓝色项。因为
+\(\bm{F}\)
+是确定矩阵，不是随机变量，所以可以从期望外提出来。}
+
+\[
+\mathbb{E}\big[\eqfocusa{\bm{F}\bm{e}_{t-1|t-1}\bm{e}_{t-1|t-1}^\top\bm{F}^\top}\big]
+= \bm{F}\,\mathbb{E}\big[\bm{e}_{t-1|t-1}\bm{e}_{t-1|t-1}^\top\big]\bm{F}^\top
+= \bm{F}\bm{P}_{t-1|t-1}\bm{F}^\top.
+\]
+
+\proofstep{have}{再看青色项。建模假设
+\(\bm{w}_t \sim \mathcal{N}(\bm{0}, \bm{Q})\)
+拆开说有两层意思：}
+
+\[
+\mathbb{E}[\bm{w}_t] = \bm{0},
+\qquad
+\mathrm{Cov}(\bm{w}_t) = \bm{Q}.
+\]
+
+\proofstep{rw}{因为这里均值本来就是 0，所以协方差定义直接退化成二阶矩：}
+
+\[
+\mathrm{Cov}(\bm{w}_t)
+= \mathbb{E}\big[(\bm{w}_t-\bm{0})(\bm{w}_t-\bm{0})^\top\big]
+= \mathbb{E}[\bm{w}_t\bm{w}_t^\top]
+= \bm{Q}.
+\]
+
+\proofstep{done}{所以青色项就是}
+\[
+\mathbb{E}\big[\eqfocusb{\bm{w}_t\bm{w}_t^\top}\big] = \bm{Q}.
+\]
+
+\proofstep{rw}{最后处理橙色交叉项。先看第一项。如果默认上一拍误差
+\(\bm{e}_{t-1|t-1}\)
+和当前过程噪声
+\(\bm{w}_t\)
+独立，那么联合期望可以拆成两个期望的乘积：}
+
+\[
+\mathbb{E}\big[\eqfocusc{\bm{e}_{t-1|t-1}\bm{w}_t^\top}\big]
+= \mathbb{E}[\bm{e}_{t-1|t-1}]\,\mathbb{E}[\bm{w}_t^\top].
+\]
+
+\proofstep{have}{再单独调用零均值：}
+
+\[
+\mathbb{E}[\bm{w}_t] = \bm{0}
+\qquad\Longrightarrow\qquad
+\mathbb{E}[\bm{w}_t^\top] = \bm{0}^\top.
+\]
+
+\proofstep{rw}{代回去以后，第一项交叉项就变成 0。}
+
+\[
+\mathbb{E}\big[\eqfocusc{\bm{e}_{t-1|t-1}\bm{w}_t^\top}\big] = \bm{0}.
+\]
+
+\proofstep{rw}{第二个交叉项完全同理：先拆，再代入
+\(\mathbb{E}[\bm{w}_t]=\bm{0}\)。}
+
+\[
+\mathbb{E}\big[\eqfocusc{\bm{w}_t\bm{e}_{t-1|t-1}^\top}\big]
+= \mathbb{E}[\bm{w}_t]\mathbb{E}[\bm{e}_{t-1|t-1}^\top]
+= \bm{0}.
+\]
+
+\section{合并结果}
+
+\proofstep{done}{把蓝色、青色、橙色三部分放回去：}
+
+\[
+\bm{P}_{t|t-1}
+= \bm{F}\bm{P}_{t-1|t-1}\bm{F}^\top + \bm{Q}.
+\]
+
+\paragraph{直觉}
+这条式子在说两件事会把不确定性推大：
+\begin{enumerate}
+  \item 旧的不确定性会被动力学矩阵
+  \(\bm{F}\)
+  传播到下一拍；
+  \item 新的一拍里，模型本身还会额外引入过程噪声
+  \(\bm{Q}\)。
+\end{enumerate}
+
+\end{document}

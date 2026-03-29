@@ -1,0 +1,25 @@
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{amsmath, amssymb, bm, mathtools}
+\usepackage{booktabs, array, longtable}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  urlcolor=blue!50!black,
+  citecolor=blue!50!black
+}
+
+\newcommand{\proofstep}[2]{%
+  \medskip
+  \noindent\textcolor{blue!65!black}{\textsf{#1}}\quad #2\par
+}
+
+\newcommand{\eqfocusa}[1]{\textcolor{blue!70!black}{#1}}
+\newcommand{\eqfocusb}[1]{\textcolor{teal!60!black}{#1}}
+\newcommand{\eqfocusc}[1]{\textcolor{orange!80!black}{#1}}
+
+\newcommand{\derivationpdflink}[2]{%
+  \href{run:#1}{#2}（\nolinkurl{#1}）%
+}

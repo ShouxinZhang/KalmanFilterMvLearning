@@ -49,6 +49,16 @@ ENV/
 *.log
 logs/
 
+# TeX note build artifacts
+notes/KF_EKF_朴素推导/*.aux
+notes/KF_EKF_朴素推导/*.out
+notes/KF_EKF_朴素推导/*.toc
+notes/KF_EKF_朴素推导/*.fls
+notes/KF_EKF_朴素推导/*.fdb_latexmk
+notes/KF_EKF_朴素推导/*.synctex.gz
+notes/KF_EKF_朴素推导/编译产物/*
+!notes/KF_EKF_朴素推导/编译产物/compile.sh
+
 # OS
 .DS_Store
 Thumbs.db

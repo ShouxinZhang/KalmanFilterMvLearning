@@ -1,0 +1,1223 @@
+\documentclass[12pt,a4paper]{ctexart}
+\input{preamble.tex}
+
+\title{KF 与 EKF 的朴素推导笔记\\
+\large 从“怎么把预测和观测揉在一起”到“怎么真正写成代码”}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\paragraph{阅读说明}
+这份 `main` PDF 保留主线叙述。需要更细的逐步推导时，正文会给出跳到子 PDF 的入口；子 PDF 放在 `derivations/` 目录下。
+
+\section{先说人话：这件事到底在解决什么问题}
+
+你每一秒都在做两件事：
+
+\begin{enumerate}
+  \item 用模型猜一下下一秒会发生什么；
+  \item 看一下传感器，再决定要不要改口。
+\end{enumerate}
+
+问题是，这两边都不可靠。
+
+\begin{itemize}
+  \item 模型不可能完美，所以“预测”会飘；
+  \item 传感器有噪声，所以“观测”也会抖。
+\end{itemize}
+
+Kalman Filter（KF）干的事，可以先完全不看公式地理解成一句话：
+
+\begin{quote}
+在每一步，把“模型预测”和“新观测”按可信度做最优加权融合。
+\end{quote}
+
+其中“可信度”不是拍脑袋写死的超参数，而是通过协方差自动算出来的。
+
+Extended Kalman Filter（EKF）则是 KF 的自然升级版：
+
+\begin{quote}
+如果系统或传感器是非线性的，就先在当前点附近用切线近似成线性的，再照着 KF 的套路走一遍。
+\end{quote}
+
+所以 KF 和 EKF 的核心结构并不神秘。真正的难点只有两个：
+
+\begin{enumerate}
+  \item 你怎么建模状态、观测、噪声；
+  \item 你怎么理解并设置 \(Q, R, P_0\) 这些协方差。
+\end{enumerate}
+
+\section{贯穿全文的例子：跟踪一辆小车}
+
+我们一直用同一个场景。
+
+\subsection{线性版本：GPS 直接测位置}
+
+一辆小车沿直线运动。我们想估计它的：
+
+\[
+\bm{x}_t =
+\begin{bmatrix}
+p_t\\
+v_t
+\end{bmatrix}
+\]
+
+其中 \(p_t\) 是位置，\(v_t\) 是速度。
+
+假设采样周期是 \(\Delta t\)，最朴素的运动模型是：
+
+\[
+\begin{aligned}
+p_t &= p_{t-1} + \Delta t\, v_{t-1} + w^{(p)}_t,\\
+v_t &= v_{t-1} + w^{(v)}_t.
+\end{aligned}
+\]
+
+这里的 \(w^{(p)}_t\) 和 \(w^{(v)}_t\) 分别表示“位置方程没写准多少”和“速度方程没写准多少”。把它们打包起来，就是过程噪声向量
+\[
+\bm{w}_t =
+\begin{bmatrix}
+w^{(p)}_t\\
+w^{(v)}_t
+\end{bmatrix}.
+\]
+
+这时状态向量的第一维是位置，第二维是速度；过程噪声向量的第一维对应位置方程的建模误差，第二维对应速度方程的建模误差。于是把两条标量方程打包后，写成矩阵就是：
+
+\[
+\bm{x}_t = \bm{F}\bm{x}_{t-1} + \bm{w}_t,
+\qquad
+\bm{F}=
+\begin{bmatrix}
+1 & \Delta t\\
+0 & 1
+\end{bmatrix}.
+\]
+
+如果 GPS 直接测位置，那么它每一拍给你的不是“位置和速度一起的完整状态”，而只是一个标量位置读数。所以观测值 \(y_t\) 等于状态里的第一项 \(p_t\) 再加上测量噪声 \(v_t\)。这里的观测矩阵只负责“从状态里拿出被传感器看到的那一项”：
+
+\[
+\bm{H}\bm{x}_t =
+\begin{bmatrix}
+1 & 0
+\end{bmatrix}
+\begin{bmatrix}
+p_t\\
+v_t
+\end{bmatrix}
+= p_t.
+\]
+
+也就是说，这个例子里的 GPS 只直接看位置，不直接看速度。于是观测模型写成矩阵就是：
+
+\[
+y_t = \bm{H}\bm{x}_t + v_t,
+\qquad
+\bm{H}=
+\begin{bmatrix}
+1 & 0
+\end{bmatrix}.
+\]
+
+这就是线性系统，可以直接用 KF。
+
+\subsection{非线性版本：路边雷达只测距离}
+
+现在把 GPS 换成雷达。雷达不直接告诉你位置，它只告诉你车到雷达站的距离。
+
+如果雷达站在原点，而小车二维位置是
+\[
+\bm{x}_t=
+\begin{bmatrix}
+p_{x,t}\\
+p_{y,t}\\
+v_{x,t}\\
+v_{y,t}
+\end{bmatrix},
+\]
+那么观测可能是
+\[
+y_t = h(\bm{x}_t) + v_t
+= \sqrt{p_{x,t}^2 + p_{y,t}^2} + v_t.
+\]
+
+这里的 \(h(\cdot)\) 已经不是直线，而是开方函数。于是标准 KF 不能直接上，得改用 EKF。
+
+\section{符号表：后面反复出现的量}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{2.4cm} >{\raggedright\arraybackslash}p{10.5cm}}
+\toprule
+符号 & 含义 \\
+\midrule
+\endhead
+\(\bm{x}_t\) & 时刻 \(t\) 的真实状态，比如位置、速度、偏置、参数等 \\
+\(\hat{\bm{x}}_{t|t-1}\) & 用时刻 \(t-1\) 的信息，对时刻 \(t\) 做出的预测 \\
+\(\hat{\bm{x}}_{t|t}\) & 融合了时刻 \(t\) 观测之后的最新估计 \\
+\(\bm{P}_{t|t-1}\) & 预测误差协方差，描述“我对预测有多没底” \\
+\(\bm{P}_{t|t}\) & 更新后的误差协方差 \\
+\(\bm{Q}\) & 过程噪声协方差，描述模型本身有多不可靠 \\
+\(\bm{R}\) & 观测噪声协方差，描述传感器有多吵 \\
+\(\bm{K}_t\) & Kalman 增益，决定这一拍到底更信预测还是更信观测 \\
+\(\bm{F}\) & 状态转移矩阵，描述状态怎么随时间推进 \\
+\(\bm{H}\) & 观测矩阵，描述状态如何映射到观测 \\
+\(\bm{y}_t\) & 观测值 \\
+\(\tilde{\bm{y}}_t\) & 残差/创新，即“实际观测 - 预测观测” \\
+\(\bm{S}_t\) & 残差协方差，描述创新本身有多大不确定性 \\
+\bottomrule
+\end{longtable}
+
+\section{KF：线性系统下的最优融合}
+
+\subsection{第一步：把问题写成状态空间模型}
+
+KF 的标准前提是：
+
+\[
+\bm{x}_t = \bm{F}\bm{x}_{t-1} + \bm{w}_t,
+\qquad
+\bm{w}_t \sim \mathcal{N}(\bm{0}, \bm{Q}),
+\]
+
+\[
+\bm{y}_t = \bm{H}\bm{x}_t + \bm{v}_t,
+\qquad
+\bm{v}_t \sim \mathcal{N}(\bm{0}, \bm{R}).
+\]
+
+这里
+\(\bm{w}_t \sim \mathcal{N}(\bm{0}, \bm{Q})\)
+的意思是：过程噪声是一个零均值高斯向量，协方差是 \(\bm{Q}\)。拆开说就是：
+\[
+\mathbb{E}[\bm{w}_t] = \bm{0},
+\qquad
+\mathrm{Cov}(\bm{w}_t) = \bm{Q}.
+\]
+
+又因为这里均值本来就是 0，所以协方差定义
+\[
+\mathrm{Cov}(\bm{w}_t)
+= \mathbb{E}\big[(\bm{w}_t-\bm{0})(\bm{w}_t-\bm{0})^\top\big]
+= \mathbb{E}[\bm{w}_t\bm{w}_t^\top]
+= \bm{Q}.
+\]
+
+后面一看到
+\(\bm{w}_t \sim \mathcal{N}(\bm{0}, \bm{Q})\)，
+本质上就是在调用这两条：一条给你零均值，一条给你噪声二阶矩等于 \(\bm{Q}\)。
+
+直觉上：
+
+\begin{itemize}
+  \item \(\bm{F}\bm{x}_{t-1}\) 是“如果世界很乖，我预测它会这样走”；
+  \item \(\bm{w}_t\) 是“世界并不乖，所以真实状态会偏离模型”；
+  \item \(\bm{H}\bm{x}_t\) 是“如果传感器理想，它本该看到什么”；
+  \item \(\bm{v}_t\) 是“传感器实际还会抖一下”。
+\end{itemize}
+
+\subsection{第二步：先做预测}
+
+\subsubsection{状态均值怎么预测}
+
+这一步不该只靠“最自然”来糊过去。先把“预测均值”到底是什么意思说清楚。
+
+到时刻 \(t-1\) 为止，我们手里已经有全部旧信息，所以
+\(\hat{\bm{x}}_{t-1|t-1}\)
+本质上是在这些旧信息条件下，对真实状态
+\(\bm{x}_{t-1}\)
+的条件期望。
+
+同理，时刻 \(t\) 的预测均值定义成：
+\[
+\hat{\bm{x}}_{t|t-1}
+= \mathbb{E}[\bm{x}_t \mid \mathcal{Y}_{1:t-1}],
+\]
+其中
+\(\mathcal{Y}_{1:t-1}\)
+表示“截至 \(t-1\) 时刻我们已经看到的全部观测信息”。
+
+\proofstep{enter}{把状态方程
+\(\bm{x}_t = \bm{F}\bm{x}_{t-1} + \bm{w}_t\)
+代进这个条件期望。}
+
+\[
+\hat{\bm{x}}_{t|t-1}
+= \mathbb{E}[\bm{F}\bm{x}_{t-1} + \bm{w}_t \mid \mathcal{Y}_{1:t-1}].
+\]
+
+\proofstep{rw}{因为
+\(\bm{F}\)
+是确定矩阵，所以可以从期望外提出来：}
+
+\[
+\hat{\bm{x}}_{t|t-1}
+= \bm{F}\,\mathbb{E}[\bm{x}_{t-1} \mid \mathcal{Y}_{1:t-1}]
++ \mathbb{E}[\bm{w}_t \mid \mathcal{Y}_{1:t-1}].
+\]
+
+\proofstep{rw}{现在处理第二项。过程噪声
+\(\bm{w}_t \sim \mathcal{N}(\bm{0},\bm{Q})\)，
+而且默认它和过去观测独立，所以即便在“已经看到过去观测”的条件下，它的均值仍然是 0：}
+
+\[
+\mathbb{E}[\bm{w}_t \mid \mathcal{Y}_{1:t-1}] = \bm{0}.
+\]
+
+\proofstep{done}{再把
+\(\mathbb{E}[\bm{x}_{t-1} \mid \mathcal{Y}_{1:t-1}]\)
+认成上一拍更新后的估计
+\(\hat{\bm{x}}_{t-1|t-1}\)，
+就得到}
+
+\[
+\hat{\bm{x}}_{t|t-1} = \bm{F}\hat{\bm{x}}_{t-1|t-1}.
+\]
+
+这条式子的真正意思是：\textbf{先把上一拍最好的状态估计沿动力学推进，再利用“过程噪声零均值”把纯随机漂移的均值贡献消掉。}
+
+\subsubsection{误差协方差怎么预测}
+
+定义预测误差
+\[
+\bm{e}_{t|t-1} = \bm{x}_t - \hat{\bm{x}}_{t|t-1},
+\]
+代入状态方程后有
+\[
+\bm{e}_{t|t-1} = \bm{F}\bm{e}_{t-1|t-1} + \bm{w}_t.
+\]
+
+所以预测协方差的主结果是：
+\[
+\bm{P}_{t|t-1}
+= \mathbb{E}[\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top]
+= \bm{F}\bm{P}_{t-1|t-1}\bm{F}^\top + \bm{Q}.
+\]
+
+这条式子的意思很朴素：下一拍的不确定性，等于“旧的不确定性被动力学传过去”再加上“这一拍新增的过程噪声”。
+
+如果你想看这里为什么会冒出交叉项、为什么交叉项最后为 0、以及
+\(\bm{w}_t \sim \mathcal{N}(\bm{0},\bm{Q})\)
+到底是怎么落到
+\(\mathbb{E}[\bm{w}_t\bm{w}_t^\top]=\bm{Q}\)
+上的，细节推导见：
+
+\begin{quote}
+\derivationpdflink{derivations/covariance_prediction.pdf}{误差协方差预测：逐步推导}
+\end{quote}
+
+\subsubsection{顺手预测一下观测}
+
+因为后面要和真实观测比，所以还要算：
+
+\[
+\hat{\bm{y}}_{t|t-1} = \bm{H}\hat{\bm{x}}_{t|t-1}.
+\]
+
+并定义创新（也叫残差）：
+
+\[
+\tilde{\bm{y}}_t = \bm{y}_t - \hat{\bm{y}}_{t|t-1}.
+\]
+
+创新就是一句大白话：\textbf{“现实和我刚才的预测差了多少。”}
+
+到这里为止，我们只做完了“先猜一下下一拍会发生什么”。但滤波真正有价值的地方，不是猜，而是\textbf{观测来了之后，怎么系统地改口}。
+
+所以接下来其实是两个连续问题：
+\begin{enumerate}
+  \item 更新公式应该长什么样；
+  \item 这个更新公式里唯一的自由度
+  “那个负责把残差变成修正量的矩阵”
+  应该怎么选。
+\end{enumerate}
+
+没有第一个问题，就谈不上第二个问题；没有第二个问题，后面那个增益矩阵的公式就会看起来像天上掉下来的。
+
+\subsection{第三步：更新的结构其实先天就长这样}
+
+这一节不先抛结论，而是从“更新时你手里到底有什么”一步步往下收。
+
+\paragraph{第一步：更新时，手里其实只有两类信息}
+
+到更新开始这一刻，你并不知道真实状态
+\(\bm{x}_t\)，
+你手里只有：
+\begin{enumerate}
+  \item 刚刚算出来的预测
+  \(\hat{\bm{x}}_{t|t-1}\)；
+  \item 传感器刚给你的新观测
+  \(\bm{y}_t\)。
+\end{enumerate}
+
+所以更新后的估计不可能凭空依赖别的东西，只能写成某个函数：
+\[
+\hat{\bm{x}}_{t|t} = \Phi(\hat{\bm{x}}_{t|t-1}, \bm{y}_t).
+\]
+
+\paragraph{第二步：真正有用的不是观测本身，而是“观测比预测多说了什么”}
+
+如果直接把
+\(\bm{y}_t\)
+塞进更新公式，你很难看出“这次观测到底带来了多少新信息”。更自然的做法，是先拿观测和预测观测做比较。
+
+我们前面已经定义了预测观测
+\[
+\hat{\bm{y}}_{t|t-1} = \bm{H}\hat{\bm{x}}_{t|t-1},
+\]
+以及创新
+\[
+\tilde{\bm{y}}_t = \bm{y}_t - \hat{\bm{y}}_{t|t-1}.
+\]
+
+这里要补一句很关键的话：在时刻 \(t\) 的更新阶段，
+\(\hat{\bm{x}}_{t|t-1}\)
+已经由预测步骤算完了，所以
+\(\hat{\bm{y}}_{t|t-1}\)
+也是一个已知量，不再是未知变量。
+
+因此，对这一拍来说，
+\(\bm{y}_t\)
+和
+\(\tilde{\bm{y}}_t\)
+其实是等价的：知道其中一个，就能立刻算出另一个。
+\[
+\tilde{\bm{y}}_t = \bm{y}_t - \hat{\bm{y}}_{t|t-1},
+\qquad
+\bm{y}_t = \tilde{\bm{y}}_t + \hat{\bm{y}}_{t|t-1}.
+\]
+
+也就是说，把更新公式写成依赖
+\(\bm{y}_t\)
+还是依赖
+\(\tilde{\bm{y}}_t\)，
+在信息量上并没有损失。
+
+只是从表达上说，
+\(\tilde{\bm{y}}_t\)
+更好，因为它直接表示“这次观测比预测多说了多少”。所以我们更愿意用创新来写更新公式。
+
+所以更新公式更应该写成：
+\[
+\hat{\bm{x}}_{t|t} = \Psi(\hat{\bm{x}}_{t|t-1}, \tilde{\bm{y}}_t).
+\]
+
+\paragraph{第三步：如果创新为 0，就不该改口}
+
+这是最基本的约束。如果
+\(\tilde{\bm{y}}_t=\bm{0}\)，
+说明观测和预测完全一致，那么更新后的估计就应该等于预测本身：
+\[
+\tilde{\bm{y}}_t = \bm{0}
+\qquad\Longrightarrow\qquad
+\hat{\bm{x}}_{t|t} = \hat{\bm{x}}_{t|t-1}.
+\]
+
+这会逼着更新公式长成“旧预测 + 一个由创新决定的修正项”：
+\[
+\hat{\bm{x}}_{t|t}
+= \hat{\bm{x}}_{t|t-1} + \bm{c}_t,
+\qquad
+\bm{c}_t = g(\tilde{\bm{y}}_t),
+\qquad
+g(\bm{0})=\bm{0}.
+\]
+
+\paragraph{第四步：把这个更新律在零创新附近做一阶线性展开}
+
+这时可以换一个更统一的视角来看。既然在时刻 \(t\)，
+\(\hat{\bm{x}}_{t|t-1}\)
+已经是已知量，那么更新律本质上就是“创新 \(\tilde{\bm{y}}_t\) 进来，吐出更新后估计”的一个函数。
+
+把
+\(\hat{\bm{x}}_{t|t-1}\)
+视为常量后，可以把它记成
+\[
+\hat{\bm{x}}_{t|t} = \varphi_t(\tilde{\bm{y}}_t).
+\]
+
+而上一步已经告诉我们：
+\[
+\varphi_t(\bm{0}) = \hat{\bm{x}}_{t|t-1}.
+\]
+
+所以如果在
+\(\tilde{\bm{y}}_t=\bm{0}\)
+附近做一阶展开，就有
+\[
+\varphi_t(\tilde{\bm{y}}_t)
+\approx
+\varphi_t(\bm{0})
++
+\left.\frac{\partial \varphi_t}{\partial \tilde{\bm{y}}}\right|_{\tilde{\bm{y}}=\bm{0}}
+\tilde{\bm{y}}_t.
+\]
+
+把
+\(\varphi_t(\bm{0}) = \hat{\bm{x}}_{t|t-1}\)
+代进去，再把那个雅可比矩阵记作
+\(\bm{G}_t\)，
+就得到
+\[
+\hat{\bm{x}}_{t|t}
+\approx
+\hat{\bm{x}}_{t|t-1} + \bm{G}_t\tilde{\bm{y}}_t.
+\]
+
+现在才把这个待定矩阵
+\(\bm{G}_t\)
+正式记作
+\(\bm{K}_t\)：
+\[
+\hat{\bm{x}}_{t|t}
+= \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t.
+\]
+
+这个视角和 EKF 很统一：都是“先有一个一般更新律，再在当前点附近抓它的一阶线性部分”。
+只是在线性 KF 里，我们最后会进一步证明：最优更新本来就落在这种线性族里，所以这里不只是拍脑袋近似，而是恰好抓住了正确的结构。
+
+这里的
+\(\bm{K}_t\)
+叫 Kalman 增益。它不是一个神秘常数，而是一个“把观测残差翻译成状态修正量”的线性映射。
+
+如果状态维度是 \(n\)，观测维度是 \(m\)，那么
+\[
+\bm{x}_t \in \mathbb{R}^n,\qquad
+\tilde{\bm{y}}_t \in \mathbb{R}^m,\qquad
+\bm{K}_t \in \mathbb{R}^{n\times m}.
+\]
+
+也就是说，
+\(\bm{K}_t\)
+的每一列都在回答一个问题：\textbf{“某一维观测差了这么多，我该把这种差异怎么分摊到各个状态维度上？”}
+
+在本文那辆小车的例子里，
+\[
+\bm{x}_t =
+\begin{bmatrix}
+p_t\\
+v_t
+\end{bmatrix},
+\qquad
+y_t \in \mathbb{R},
+\]
+所以创新
+\(\tilde{y}_t\)
+是一个标量，而
+\(\bm{K}_t\)
+是一个二维列向量：
+\[
+\bm{K}_t =
+\begin{bmatrix}
+k_p\\
+k_v
+\end{bmatrix}.
+\]
+
+于是更新式其实是在说：
+\[
+\hat{p}_{t|t} = \hat{p}_{t|t-1} + k_p \tilde{y}_t,
+\qquad
+\hat{v}_{t|t} = \hat{v}_{t|t-1} + k_v \tilde{y}_t.
+\]
+
+这句话很关键：虽然传感器这次只直接看到了位置，但位置残差依然能顺带修正速度；修正多少，由
+\(\bm{K}_t\)
+自动决定。
+
+所以 Kalman 增益本质上就是：
+
+\begin{quote}
+把“观测误差”翻译成“状态修正量”的矩阵。
+\end{quote}
+
+如果你想看这条更新结构为什么几乎是被问题形式逼出来的，以及为什么
+\(\bm{K}_t\)
+在标量观测时会退化成“给每个状态分配一个修正系数”的列向量，细节推导见：
+
+\begin{quote}
+\derivationpdflink{derivations/update_structure.pdf}{更新结构与 Kalman 增益含义：逐步说明}
+\end{quote}
+
+\subsection{第四步：Kalman 增益为什么是这个公式}
+
+上一节其实只做了一半。它告诉我们：合理的更新族应该写成
+\[
+\hat{\bm{x}}_{t|t}
+= \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t.
+\]
+
+但这时
+\(\bm{K}_t\)
+还完全没定。也就是说，\textbf{更新结构已经确定了，可“到底修多大”还没确定。}
+
+所以这一节不是从状态空间模型直接跳到
+\(\bm{K}_t\)
+公式，而是顺着下面这条链往下走：
+\begin{enumerate}
+  \item 先固定更新结构；
+  \item 把更新后误差写成
+  \(\bm{K}_t\)
+  的函数；
+  \item 再把更新后协方差写成
+  \(\bm{K}_t\)
+  的函数；
+  \item 最后选一个让后验不确定性最小的
+  \(\bm{K}_t\)。
+\end{enumerate}
+
+更新后误差满足：
+
+\[
+\bm{e}_{t|t}
+= \bm{x}_t - \hat{\bm{x}}_{t|t}
+= \bm{x}_t - \hat{\bm{x}}_{t|t-1} - \bm{K}_t(\bm{y}_t - \bm{H}\hat{\bm{x}}_{t|t-1}).
+\]
+
+因为
+\[
+\bm{y}_t = \bm{H}\bm{x}_t + \bm{v}_t,
+\]
+可得
+\[
+\bm{e}_{t|t}
+= (\bm{I} - \bm{K}_t\bm{H})\bm{e}_{t|t-1} - \bm{K}_t\bm{v}_t.
+\]
+
+如果默认预测误差和当前观测噪声独立，那么更新后协方差可以写成：
+
+\[
+\bm{P}_{t|t}
+= (\bm{I} - \bm{K}_t\bm{H})\bm{P}_{t|t-1}(\bm{I} - \bm{K}_t\bm{H})^\top
++ \bm{K}_t\bm{R}\bm{K}_t^\top.
+\]
+
+这就是著名的 Joseph 形式。它非常重要，因为它数值上更稳定，也天然保持对称半正定。
+
+接下来的目标，就是选一个
+\(\bm{K}_t\)
+让后验协方差尽可能小。
+
+为什么优化的是后验协方差，而不是别的量？因为更新后真正留在你手里的，就是
+\(\hat{\bm{x}}_{t|t}\)
+和它对应的不确定性
+\(\bm{P}_{t|t}\)。
+均值负责回答“你现在猜多少”，协方差负责回答“你现在有多心虚”。所以自然目标就是：\textbf{在允许的线性更新族里，选一个让后验误差尽可能小的
+\(\bm{K}_t\)。}
+
+最后会得到：
+
+\[
+\bm{K}_t = \bm{P}_{t|t-1}\bm{H}^\top \bm{S}_t^{-1}.
+\]
+
+这里
+\[
+\bm{S}_t = \bm{H}\bm{P}_{t|t-1}\bm{H}^\top + \bm{R}
+\]
+叫创新协方差。它描述的不是“状态有多不确定”，而是“这一拍观测残差本身有多不确定”。
+
+\paragraph{这条公式最值得记住的直觉}
+
+\begin{itemize}
+  \item \(\bm{P}_{t|t-1}\) 大，说明我们对预测没把握，\(\bm{K}_t\) 会变大，更信观测；
+  \item \(\bm{R}\) 大，说明传感器很吵，\(\bm{S}_t\) 变大，\(\bm{K}_t\) 会变小，更信预测；
+  \item \(\bm{H}\) 决定了观测到底能看到状态的哪些方向。
+\end{itemize}
+
+很多教材还会把协方差更新写成更短的样子：
+
+\[
+\bm{P}_{t|t} = (\bm{I} - \bm{K}_t\bm{H})\bm{P}_{t|t-1}.
+\]
+
+它在最优
+\(\bm{K}_t\)
+下理论上成立，但实际代码里仍建议优先使用 Joseph 形式：
+
+\[
+\bm{P}_{t|t}
+= (\bm{I} - \bm{K}_t\bm{H})\bm{P}_{t|t-1}(\bm{I} - \bm{K}_t\bm{H})^\top
++ \bm{K}_t\bm{R}\bm{K}_t^\top.
+\]
+
+原因很简单：浮点数世界不讲道理，简化式更容易把协方差算出非对称甚至非正定。
+
+如果你想看这两件事的细节：
+
+\begin{enumerate}
+  \item Joseph 形式怎么一步步推出来；
+  \item 为什么最优增益会是
+  \(\bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}\)；
+  \item 为什么代回后又能化成更短的协方差更新；
+\end{enumerate}
+
+见独立推导 PDF：
+
+\begin{quote}
+\derivationpdflink{derivations/kalman_gain.pdf}{Kalman 增益与 Joseph 形式：逐步推导}
+\end{quote}
+
+\subsection{KF 全流程汇总}
+
+\subsubsection{预测}
+
+\[
+\hat{\bm{x}}_{t|t-1} = \bm{F}\hat{\bm{x}}_{t-1|t-1},
+\]
+
+\[
+\bm{P}_{t|t-1} = \bm{F}\bm{P}_{t-1|t-1}\bm{F}^\top + \bm{Q},
+\]
+
+\[
+\hat{\bm{y}}_{t|t-1} = \bm{H}\hat{\bm{x}}_{t|t-1},
+\]
+
+\[
+\bm{S}_t = \bm{H}\bm{P}_{t|t-1}\bm{H}^\top + \bm{R}.
+\]
+
+\subsubsection{更新}
+
+\[
+\bm{K}_t = \bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1},
+\]
+
+\[
+\tilde{\bm{y}}_t = \bm{y}_t - \hat{\bm{y}}_{t|t-1},
+\]
+
+\[
+\hat{\bm{x}}_{t|t} = \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t,
+\]
+
+\[
+\bm{P}_{t|t}
+= (\bm{I} - \bm{K}_t\bm{H})\bm{P}_{t|t-1}(\bm{I} - \bm{K}_t\bm{H})^\top
++ \bm{K}_t\bm{R}\bm{K}_t^\top.
+\]
+
+\section{一个能手算的 KF 数值例子}
+
+先故意用最简单的一维版本，把逻辑彻底看透。
+
+\subsection{设定}
+
+假设状态就是小车位置 \(x_t\)，动态模型和观测模型分别是：
+
+\[
+x_t = x_{t-1} + w_t,\qquad w_t \sim \mathcal{N}(0,1),
+\]
+
+\[
+y_t = x_t + v_t,\qquad v_t \sim \mathcal{N}(0,4).
+\]
+
+已知上一时刻更新后：
+
+\[
+\hat{x}_{t-1|t-1} = 10,\qquad P_{t-1|t-1} = 9.
+\]
+
+这一时刻来了一个观测：
+
+\[
+y_t = 13.
+\]
+
+\subsection{预测}
+
+因为这里 \(F=1\)，所以
+
+\[
+\hat{x}_{t|t-1} = 10.
+\]
+
+\[
+P_{t|t-1} = 9 + 1 = 10.
+\]
+
+\subsection{更新}
+
+创新协方差：
+
+\[
+S_t = P_{t|t-1} + R = 10 + 4 = 14.
+\]
+
+Kalman 增益：
+
+\[
+K_t = \frac{10}{14} \approx 0.714.
+\]
+
+创新：
+
+\[
+\tilde{y}_t = 13 - 10 = 3.
+\]
+
+更新后的估计：
+
+\[
+\hat{x}_{t|t}
+= 10 + 0.714 \times 3
+\approx 12.14.
+\]
+
+更新后的协方差：
+
+\[
+P_{t|t} = (1 - 0.714)\times 10 \approx 2.86.
+\]
+
+\subsection{这组数字说明了什么}
+
+\begin{itemize}
+  \item 预测值是 10，观测值是 13，最后结果是 12.14，没有完全信任何一边；
+  \item 因为预测方差 10 比观测噪声 4 更大，说明当前更该信观测，所以 \(K_t\) 比较大；
+  \item 更新后 \(P\) 从 10 下降到 2.86，说明融合完这次观测之后，我们心里更有数了。
+\end{itemize}
+
+\section{EKF：KF 的结构不变，只是把非线性局部拉直}
+
+\subsection{KF 为什么不能直接处理非线性}
+
+如果系统变成：
+
+\[
+\bm{x}_t = f(\bm{x}_{t-1}) + \bm{w}_t,
+\]
+
+\[
+\bm{y}_t = h(\bm{x}_t) + \bm{v}_t,
+\]
+
+那么麻烦在于：
+
+\begin{itemize}
+  \item 经过 \(f(\cdot)\) 之后，高斯分布一般不再严格保持高斯；
+  \item 协方差传播也不能直接写成 \(\bm{F}\bm{P}\bm{F}^\top\)；
+  \item 观测映射 \(h(\cdot)\) 也不能直接用一个固定矩阵 \(\bm{H}\) 表示。
+\end{itemize}
+
+EKF 的处理思路很务实：
+
+\begin{quote}
+我不试图全局搞定这个弯函数，而是只在“当前估计附近”把它一阶泰勒展开，临时当成线性的。
+\end{quote}
+
+\subsection{EKF 的核心近似}
+
+在当前工作点附近，
+
+\[
+f(\bm{x}) \approx f(\bar{\bm{x}}) + \bm{F}_t(\bm{x} - \bar{\bm{x}}),
+\qquad
+\bm{F}_t = \left.\frac{\partial f}{\partial \bm{x}}\right|_{\bar{\bm{x}}},
+\]
+
+\[
+h(\bm{x}) \approx h(\bar{\bm{x}}) + \bm{H}_t(\bm{x} - \bar{\bm{x}}),
+\qquad
+\bm{H}_t = \left.\frac{\partial h}{\partial \bm{x}}\right|_{\bar{\bm{x}}}.
+\]
+
+这里的 \(\bm{F}_t\) 和 \(\bm{H}_t\) 就是雅可比矩阵。它们的角色和线性 KF 里的 \(\bm{F}, \bm{H}\) 完全一样，只不过现在每一步都要重算。
+
+\subsection{EKF 预测}
+
+\[
+\hat{\bm{x}}_{t|t-1} = f(\hat{\bm{x}}_{t-1|t-1}),
+\]
+
+\[
+\bm{F}_t = \left.\frac{\partial f}{\partial \bm{x}}\right|_{\hat{\bm{x}}_{t-1|t-1}},
+\]
+
+\[
+\bm{P}_{t|t-1} = \bm{F}_t\bm{P}_{t-1|t-1}\bm{F}_t^\top + \bm{Q}.
+\]
+
+\subsection{EKF 更新}
+
+\[
+\hat{\bm{y}}_{t|t-1} = h(\hat{\bm{x}}_{t|t-1}),
+\]
+
+\[
+\bm{H}_t = \left.\frac{\partial h}{\partial \bm{x}}\right|_{\hat{\bm{x}}_{t|t-1}},
+\]
+
+\[
+\bm{S}_t = \bm{H}_t\bm{P}_{t|t-1}\bm{H}_t^\top + \bm{R},
+\]
+
+\[
+\bm{K}_t = \bm{P}_{t|t-1}\bm{H}_t^\top \bm{S}_t^{-1},
+\]
+
+\[
+\hat{\bm{x}}_{t|t} = \hat{\bm{x}}_{t|t-1} + \bm{K}_t\left(\bm{y}_t - \hat{\bm{y}}_{t|t-1}\right),
+\]
+
+\[
+\bm{P}_{t|t}
+= (\bm{I} - \bm{K}_t\bm{H}_t)\bm{P}_{t|t-1}(\bm{I} - \bm{K}_t\bm{H}_t)^\top
++ \bm{K}_t\bm{R}\bm{K}_t^\top.
+\]
+
+\subsection{这到底和 KF 差在哪}
+
+结构上几乎没差，真正的区别只有两条：
+
+\begin{enumerate}
+  \item 状态预测不再是矩阵乘法，而是 \(f(\cdot)\)；
+  \item 传播协方差和做观测更新时，用的是当前点的雅可比 \(\bm{F}_t,\bm{H}_t\)，而不是固定矩阵。
+\end{enumerate}
+
+所以 EKF 的一句话定义可以非常朴素：
+
+\begin{quote}
+KF 是“在线性世界里做最优融合”；EKF 是“先把局部世界近似成线性，再做近似最优融合”。
+\end{quote}
+
+\section{一个能看懂 EKF 的数值例子}
+
+\subsection{场景}
+
+还追那辆车，但现在雷达只能测它到原点的距离。
+
+假设当前预测状态是二维位置：
+
+\[
+\hat{\bm{x}}_{t|t-1} =
+\begin{bmatrix}
+3\\
+4
+\end{bmatrix},
+\qquad
+\bm{P}_{t|t-1} =
+\begin{bmatrix}
+1 & 0\\
+0 & 1
+\end{bmatrix}.
+\]
+
+观测模型是：
+
+\[
+y_t = h(\bm{x}_t) + v_t
+= \sqrt{p_x^2 + p_y^2} + v_t,
+\qquad
+R = 0.25.
+\]
+
+实际观测到的距离是：
+
+\[
+y_t = 4.7.
+\]
+
+\subsection{先算预测观测}
+
+\[
+\hat{y}_{t|t-1}
+= \sqrt{3^2 + 4^2}
+= 5.
+\]
+
+创新：
+
+\[
+\tilde{y}_t = 4.7 - 5 = -0.3.
+\]
+
+\subsection{算雅可比}
+
+对
+\[
+h(\bm{x}) = \sqrt{p_x^2 + p_y^2}
+\]
+求导：
+
+\[
+\bm{H}_t
+=
+\begin{bmatrix}
+\dfrac{p_x}{\sqrt{p_x^2 + p_y^2}} &
+\dfrac{p_y}{\sqrt{p_x^2 + p_y^2}}
+\end{bmatrix}.
+\]
+
+代入 \((p_x, p_y)=(3,4)\)，得到：
+
+\[
+\bm{H}_t =
+\begin{bmatrix}
+0.6 & 0.8
+\end{bmatrix}.
+\]
+
+\subsection{算增益并更新}
+
+\[
+S_t = \bm{H}_t\bm{P}_{t|t-1}\bm{H}_t^\top + R
+= 0.6^2 + 0.8^2 + 0.25
+= 1.25.
+\]
+
+\[
+\bm{K}_t
+= \bm{P}_{t|t-1}\bm{H}_t^\top S_t^{-1}
+=
+\begin{bmatrix}
+1 & 0\\
+0 & 1
+\end{bmatrix}
+\begin{bmatrix}
+0.6\\
+0.8
+\end{bmatrix}
+\frac{1}{1.25}
+=
+\begin{bmatrix}
+0.48\\
+0.64
+\end{bmatrix}.
+\]
+
+所以更新后：
+
+\[
+\hat{\bm{x}}_{t|t}
+=
+\begin{bmatrix}
+3\\
+4
+\end{bmatrix}
++
+\begin{bmatrix}
+0.48\\
+0.64
+\end{bmatrix}
+(-0.3)
+=
+\begin{bmatrix}
+2.856\\
+3.808
+\end{bmatrix}.
+\]
+
+\subsection{直觉解释}
+
+因为观测距离比预测距离更小，所以估计位置会往原点缩一点。
+
+而且缩的方向不是乱缩，而是沿着雅可比
+\[
+\begin{bmatrix}
+0.6 & 0.8
+\end{bmatrix}
+\]
+指向的“距离增加最快方向”去修正。这就是 EKF 里雅可比真正的物理含义：
+
+\begin{quote}
+它告诉你，当前这个观测对各个状态维度到底敏感到什么程度。
+\end{quote}
+
+\section{KF 与 EKF 的差异，压缩成四句话}
+
+\begin{enumerate}
+  \item KF 假设状态转移和观测关系都是线性的；EKF 允许非线性。
+  \item KF 用固定的 \(\bm{F}, \bm{H}\)；EKF 每一步都要算雅可比 \(\bm{F}_t, \bm{H}_t\)。
+  \item KF 在线性高斯条件下是最优的；EKF 是局部线性化后的近似方法。
+  \item 非线性越强、初值越差、噪声越大，EKF 越容易发散。
+\end{enumerate}
+
+\section{从公式走到代码：真正有用的落地细节}
+
+\subsection{Q、R、P0 分别该怎么理解}
+
+\subsubsection{R：传感器有多吵}
+
+\(\bm{R}\) 大，表示你对传感器不信任，更新时更偏向预测。
+
+如果能单独采一段静态数据，直接估计传感器噪声方差，这是最靠谱的做法。
+
+\subsubsection{Q：模型有多不靠谱}
+
+\(\bm{Q}\) 大，表示你承认“真实系统经常偏离我写下来的动力学模型”，因此预测协方差会更大，滤波器也会更愿意接受新观测。
+
+实践里最容易犯的错是：
+
+\begin{itemize}
+  \item \(\bm{Q}\) 设得过小：滤波器过度自信，遇到模型失配时改不回来；
+  \item \(\bm{Q}\) 设得过大：滤波器每一步都像失忆一样，输出抖。
+\end{itemize}
+
+\subsubsection{P0：初始时你到底有多心虚}
+
+\(\bm{P}_0\) 是初始估计的不确定性。
+
+\begin{itemize}
+  \item 如果初值很准，\(\bm{P}_0\) 可以小一些；
+  \item 如果初值只是拍脑袋给的，\(\bm{P}_0\) 应该大一些。
+\end{itemize}
+
+它直接影响前几步 Kalman 增益的大小，所以别把它当成无关紧要的初始化细节。
+
+\subsection{工程上强烈建议的实现细节}
+
+\subsubsection{1. 协方差更新优先用 Joseph 形式}
+
+不要偷懒只写
+\[
+\bm{P} = (\bm{I}-\bm{K}\bm{H})\bm{P}.
+\]
+
+推荐写成：
+
+\[
+\bm{P}
+= (\bm{I} - \bm{K}\bm{H})\bm{P}(\bm{I} - \bm{K}\bm{H})^\top
++ \bm{K}\bm{R}\bm{K}^\top.
+\]
+
+原因：更稳，更不容易数值炸掉。
+
+\subsubsection{2. 每一步后强制对称化}
+
+实际代码中常见处理：
+
+\[
+\bm{P} \leftarrow \frac{\bm{P} + \bm{P}^\top}{2}.
+\]
+
+这是因为浮点误差会让本来应当对称的协方差出现微小偏斜。
+
+\subsubsection{3. 别直接求逆，改解线性方程}
+
+数学上写 \(\bm{S}^{-1}\) 很方便，但代码里别真的调用矩阵求逆。优先用 Cholesky 分解或线性求解器。
+
+原因：更稳，也更快。
+
+\subsubsection{4. EKF 的雅可比必须在正确工作点计算}
+
+最常见的选择是：
+
+\begin{itemize}
+  \item 预测用的雅可比 \(\bm{F}_t\)，在 \(\hat{\bm{x}}_{t-1|t-1}\) 处算；
+  \item 更新用的雅可比 \(\bm{H}_t\)，在 \(\hat{\bm{x}}_{t|t-1}\) 处算。
+\end{itemize}
+
+点选错了，EKF 可能直接漂掉。
+
+\subsubsection{5. 有角度就做角度归一化}
+
+如果观测里有航向角、方位角之类，创新不能直接做普通减法。比如 \(179^\circ\) 和 \(-179^\circ\) 的真实差不是 \(358^\circ\)，而是 \(2^\circ\)。
+
+所以残差里出现角度时，必须先 wrap 到合法区间。
+
+\subsubsection{6. 观测缺失时不要硬更新}
+
+如果这一时刻没观测，或者观测被判为异常值，就只做预测，不做更新。
+
+KF/EKF 天然支持这种模式。
+
+\subsection{什么时候 EKF 容易失效}
+
+\begin{enumerate}
+  \item 非线性太强，而一阶线性化太粗糙；
+  \item 初值离真实状态太远，导致切线方向本身就错；
+  \item 模型写错，\(\bm{Q}\) 却又设得很小，滤波器被错误模型锁死；
+  \item 雅可比写错，这是最常见也最隐蔽的 bug；
+  \item 状态或协方差尺度差异极大，数值条件很差。
+\end{enumerate}
+
+如果你遇到这些问题，常见替代方案包括：UKF、粒子滤波、迭代 EKF，或者先把状态做更合理的参数化与归一化。
+
+\section{最小可执行伪代码}
+
+\subsection{KF}
+
+\begin{verbatim}
+given x_hat, P
+for each step t:
+    # predict
+    x_pred = F @ x_hat
+    P_pred = F @ P @ F.T + Q
+
+    y_pred = H @ x_pred
+    innov = y - y_pred
+    S = H @ P_pred @ H.T + R
+    K = P_pred @ H.T @ inv(S)
+
+    # update
+    x_hat = x_pred + K @ innov
+    I = eye(dim_x)
+    P = (I - K @ H) @ P_pred @ (I - K @ H).T + K @ R @ K.T
+\end{verbatim}
+
+\subsection{EKF}
+
+\begin{verbatim}
+given x_hat, P
+for each step t:
+    # predict
+    x_pred = f(x_hat)
+    F = jacobian_f(at=x_hat)
+    P_pred = F @ P @ F.T + Q
+
+    # update
+    y_pred = h(x_pred)
+    H = jacobian_h(at=x_pred)
+    innov = y - y_pred
+    innov = normalize_angle_if_needed(innov)
+
+    S = H @ P_pred @ H.T + R
+    K = P_pred @ H.T @ inv(S)
+
+    x_hat = x_pred + K @ innov
+    I = eye(dim_x)
+    P = (I - K @ H) @ P_pred @ (I - K @ H).T + K @ R @ K.T
+\end{verbatim}
+
+\section{如果只记住一页内容}
+
+\begin{enumerate}
+  \item KF 解决的是“模型预测”和“带噪观测”如何最优融合的问题。
+  \item 预测阶段靠模型推进均值和协方差；更新阶段靠创新和增益修正状态。
+  \item Kalman 增益不是魔法，它只是“不确定性驱动的自适应权重”。
+  \item EKF 不是另一套新宇宙，它只是把非线性系统在当前点局部线性化后，再走一遍 KF。
+  \item 真正决定效果的，往往不是公式会不会背，而是建模是否合理、雅可比是否正确，以及 Q、R、P0 是否符合物理现实。
+\end{enumerate}
+
+\section{附：从学习视角再看一眼 KF / EKF}
+
+如果你更熟悉机器学习，可以把更新式
+
+\[
+\hat{\bm{x}}_{t|t}
+= \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t
+\]
+
+看成一种“自适应学习率”的梯度式修正：
+
+\begin{itemize}
+  \item \(\tilde{\bm{y}}_t\) 类似误差；
+  \item \(\bm{K}_t\) 类似每个方向上的动态学习率；
+  \item 但它不是手工调出来的，而是由 \(\bm{P}, \bm{Q}, \bm{R}\) 自动推出来的。
+\end{itemize}
+
+这也是 KF / EKF 到今天仍然很有生命力的原因：
+
+\begin{quote}
+它不是“把公式背下来”，而是“把不确定性明确建模，再让不确定性决定每一步该学多大”。
+\end{quote}
+
+\end{document}
