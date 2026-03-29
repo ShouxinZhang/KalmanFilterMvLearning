@@ -699,39 +699,120 @@ v_t
 = \bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t.
 \]
 
-现在最朴素的要求是：\textbf{既然你已经把创新
+先说朴素想法。既然这一拍你已经把创新
 \(\tilde{\bm{y}}_t\)
-用过一次了，那更新后剩下的误差就不该再和它有系统相关。}
+拿来修正过一次了，那么一个“像样”的更新结果至少应该满足：\textbf{修完之后，误差里不要还残留和这份创新同方向的、可继续利用的信息。}
 
-不然就说明这份创新里还有没榨干的信息，你还能继续改得更好。
+不然就说明这次观测里还有东西没用干净，你还可以顺着同一份残差继续往下修。
 
-把这句话写成数学条件，就是
+不过这句话目前还只是直觉，不是证明。真正严谨的做法，还是把优化目标明确写出来，然后对
+\(\bm{K}_t\)
+求最小值。
+
+现在直接走最短路线：先把要优化的量写出来，然后对
+\(\bm{K}_t\)
+求最小值。
+
+我们在线性更新族里真正想做的事，是选一个
+\(\bm{K}_t\)，
+让更新后的均方误差最小：
 \[
-\mathbb{E}[\bm{e}_{t|t}\tilde{\bm{y}}_t^\top] = \bm{0}.
+J(\bm{K}_t)
+= \mathbb{E}[\|\bm{e}_{t|t}\|_2^2]
+= \mathrm{tr}(\bm{P}_{t|t}).
 \]
+
+最后这个等号也不是凭空来的。因为
+\[
+\|\bm{e}_{t|t}\|_2^2
+= \bm{e}_{t|t}^\top \bm{e}_{t|t}
+= \mathrm{tr}(\bm{e}_{t|t}\bm{e}_{t|t}^\top),
+\]
+所以
+\[
+\mathbb{E}[\|\bm{e}_{t|t}\|_2^2]
+= \mathrm{tr}\!\Bigl(
+\mathbb{E}[\bm{e}_{t|t}\bm{e}_{t|t}^\top]
+\Bigr)
+= \mathrm{tr}(\bm{P}_{t|t}).
+\]
+
+这里“迹和期望可交换”也不神秘。设随机矩阵
+\(\bm{A}=(A_{ij})\)，
+那么
+\[
+\mathrm{tr}(\mathbb{E}[\bm{A}])
+= \sum_i \mathbb{E}[A_{ii}]
+= \mathbb{E}\Bigl[\sum_i A_{ii}\Bigr]
+= \mathbb{E}[\mathrm{tr}(\bm{A})].
+\]
+
+中间这一步
+\[
+\sum_i \mathbb{E}[A_{ii}]
+= \mathbb{E}\Bigl[\sum_i A_{ii}\Bigr]
+\]
+用的只是期望的线性性：
+\[
+\mathbb{E}[X_1+\cdots+X_n]
+= \mathbb{E}[X_1]+\cdots+\mathbb{E}[X_n].
+\]
+
+所以它本质上只是：\textbf{有限项求和可以靠期望的线性性移进移出。}
 
 把
 \(\bm{e}_{t|t} = \bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t\)
 代进去：
 \[
-\mathbb{E}[(\bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t)\tilde{\bm{y}}_t^\top] = \bm{0}.
+J(\bm{K}_t)
+= \mathrm{tr}\!\Bigl(
+\mathbb{E}\bigl[
+(\bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t)
+(\bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t)^\top
+\bigr]
+\Bigr).
 \]
 
-展开后得到
+把括号展开，再把前两步已经算出的
 \[
 \mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
-- \bm{K}_t\mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top]
-= \bm{0}.
+= \bm{P}_{t|t-1}\bm{H}^\top,
+\qquad
+\mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top]
+= \bm{S}_t
 \]
-
-也就是
+代进去，可得
 \[
-\bm{K}_t
-= \mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
-\Bigl(\mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top]\Bigr)^{-1}.
+\begin{aligned}
+J(\bm{K}_t)
+=\;&
+\mathrm{tr}(\bm{P}_{t|t-1})
+- 2\,\mathrm{tr}(\bm{K}_t\bm{H}\bm{P}_{t|t-1}) \\
+&+ \mathrm{tr}(\bm{K}_t\bm{S}_t\bm{K}_t^\top).
+\end{aligned}
 \]
 
-把前两步刚刚算出的两个量代进去：
+现在直接对
+\(\bm{K}_t\)
+求导。用到两条常见公式：
+\[
+\frac{\partial}{\partial \bm{K}}
+\mathrm{tr}(\bm{K}\bm{A})
+= \bm{A}^\top,
+\qquad
+\frac{\partial}{\partial \bm{K}}
+\mathrm{tr}(\bm{K}\bm{S}\bm{K}^\top)
+= 2\bm{K}\bm{S}
+\quad(\bm{S}=\bm{S}^\top).
+\]
+
+于是
+\[
+\frac{\partial J}{\partial \bm{K}_t}
+= -2\bm{P}_{t|t-1}\bm{H}^\top + 2\bm{K}_t\bm{S}_t.
+\]
+
+令导数为 0，就得到最优条件：
 \[
 \bm{K}_t
 = \bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}.
@@ -792,23 +873,44 @@ K_t
 
 \subsection{KF 全流程汇总}
 
+这一节不是为了再推导一次，而是把前面的结果压成一页“可执行配方”。
+
+读到这里如果已经把字母忘了，很正常。先把最常用的符号再翻回人话：
+\begin{itemize}
+  \item \(\hat{\bm{x}}_{t|t-1}\)：看到第 \(t\) 拍观测之前，对当前状态的预测；
+  \item \(\bm{P}_{t|t-1}\)：这份预测还有多不确定；
+  \item \(\hat{\bm{y}}_{t|t-1}\)：如果当前预测没错，传感器大概应该读到什么；
+  \item \(\tilde{\bm{y}}_t\)：真实观测和预测观测的差，也就是创新/残差；
+  \item \(\bm{S}_t\)：这份残差本身有多不确定；
+  \item \(\bm{K}_t\)：该把这份残差按多大力度翻译成状态修正量；
+  \item \(\bm{P}_{t|t}\)：更新完之后，还剩多少不确定性。
+\end{itemize}
+
 \subsubsection{预测}
 
 \[
 \hat{\bm{x}}_{t|t-1} = \bm{F}\hat{\bm{x}}_{t-1|t-1},
 \]
 
+就是：先把上一拍最好的估计，沿着动力学模型往前推一拍。
+
 \[
 \bm{P}_{t|t-1} = \bm{F}\bm{P}_{t-1|t-1}\bm{F}^\top + \bm{Q},
 \]
+
+就是：旧的不确定性被系统传过来，再加上这一拍新增的过程噪声。
 
 \[
 \hat{\bm{y}}_{t|t-1} = \bm{H}\hat{\bm{x}}_{t|t-1},
 \]
 
+就是：按当前预测来看，传感器这拍本来应该读到什么。
+
 \[
 \bm{S}_t = \bm{H}\bm{P}_{t|t-1}\bm{H}^\top + \bm{R}.
 \]
+
+就是：这份“残差”自己到底有多靠谱，还是有多吵。
 
 \subsubsection{更新}
 
@@ -816,19 +918,27 @@ K_t
 \bm{K}_t = \bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1},
 \]
 
+就是：先看残差对状态误差有没有用，再看这份残差自己靠不靠谱，最后决定修多大。
+
 \[
 \tilde{\bm{y}}_t = \bm{y}_t - \hat{\bm{y}}_{t|t-1},
 \]
 
+就是：现实和刚才预测到底差了多少。
+
 \[
 \hat{\bm{x}}_{t|t} = \hat{\bm{x}}_{t|t-1} + \bm{K}_t\tilde{\bm{y}}_t,
 \]
+
+就是：用 Kalman 增益把残差翻译成状态修正量，加回预测值得到更新结果。
 
 \[
 \bm{P}_{t|t}
 = (\bm{I} - \bm{K}_t\bm{H})\bm{P}_{t|t-1}(\bm{I} - \bm{K}_t\bm{H})^\top
 + \bm{K}_t\bm{R}\bm{K}_t^\top.
 \]
+
+就是：更新之后，原先那份不确定性被压小了，但测量噪声本身也会留下影响。
 
 \section{一个能手算的 KF 数值例子}
 

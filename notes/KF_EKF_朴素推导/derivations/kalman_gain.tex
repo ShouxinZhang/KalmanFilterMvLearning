@@ -165,7 +165,7 @@
 
 \proofstep{done}{这条式子在直觉上很重要：如果某个状态方向和创新根本不相关，那创新就没有理由去修它。}
 
-\section{第四步：用“更新后误差不该再和创新相关”解出 \texorpdfstring{$\bm{K}_t$}{K_t}}
+\section{第四步：直接把目标函数写出来，对 \texorpdfstring{$\bm{K}_t$}{K_t} 求最小值}
 
 \proofstep{enter}{更新结构已经固定成}
 
@@ -182,41 +182,164 @@
 = \bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t.
 \]
 
-\proofstep{have}{现在用一个很朴素的最优性要求：既然创新
+\proofstep{have}{先说朴素想法。既然创新
 \(\tilde{\bm{y}}_t\)
-已经被用来修正状态了，那么更新后剩下的误差
-\(\bm{e}_{t|t}\)
-就不该再和创新有系统相关。否则就说明创新里还有没榨干的信息。}
+已经被拿来修正过一次，那么修完之后的误差里，就不该还残留和这份创新同方向的、可继续利用的信息。}
+
+\proofstep{rw}{但这句话本身还只是直觉。严格证明时，还是应该回到最优化问题本身：直接把目标函数写出来，对
+\(\bm{K}_t\)
+求最小值。}
 
 \[
-\mathbb{E}[\bm{e}_{t|t}\tilde{\bm{y}}_t^\top] = \bm{0}.
+J(\bm{K}_t)
+= \mathbb{E}[\|\bm{e}_{t|t}\|_2^2]
+= \mathrm{tr}(\bm{P}_{t|t}).
 \]
+
+\proofstep{rw}{这里最后一个等号来自协方差定义。因为}
+
+\[
+\|\bm{e}_{t|t}\|_2^2
+= \bm{e}_{t|t}^\top\bm{e}_{t|t}
+= \mathrm{tr}(\bm{e}_{t|t}\bm{e}_{t|t}^\top),
+\]
+
+\proofstep{rw}{再利用“期望和迹可以交换”，就有}
+
+\[
+\mathbb{E}[\|\bm{e}_{t|t}\|_2^2]
+= \mathrm{tr}\!\Bigl(
+\mathbb{E}[\bm{e}_{t|t}\bm{e}_{t|t}^\top]
+\Bigr)
+= \mathrm{tr}(\bm{P}_{t|t}).
+\]
+
+\proofstep{rw}{如果你还想追问“为什么迹和期望可以交换”，那就把它写成分量和：设
+\(\bm{A}=(A_{ij})\)，
+则}
+
+\[
+\mathrm{tr}(\mathbb{E}[\bm{A}])
+= \sum_i \mathbb{E}[A_{ii}]
+= \mathbb{E}\Bigl[\sum_i A_{ii}\Bigr]
+= \mathbb{E}[\mathrm{tr}(\bm{A})].
+\]
+
+\proofstep{rw}{这里中间那一步}
+
+\[
+\sum_i \mathbb{E}[A_{ii}]
+= \mathbb{E}\Bigl[\sum_i A_{ii}\Bigr]
+\]
+
+\proofstep{rw}{用的只是期望的线性性：}
+
+\[
+\mathbb{E}[X_1+\cdots+X_n]
+= \mathbb{E}[X_1]+\cdots+\mathbb{E}[X_n].
+\]
+
+\proofstep{done}{所以这里本质上只是把有限项求和靠期望的线性性移进移出。}
 
 \proofstep{rw}{把
-\(\bm{e}_{t|t}=\bm{e}_{t|t-1}-\bm{K}_t\tilde{\bm{y}}_t\)
-代进去：}
+\(\bm{e}_{t|t} = \bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t\)
+直接代进去：}
 
 \[
-\mathbb{E}[(\bm{e}_{t|t-1}-\bm{K}_t\tilde{\bm{y}}_t)\tilde{\bm{y}}_t^\top] = \bm{0}.
+J(\bm{K}_t)
+= \mathrm{tr}\!\Bigl(
+\mathbb{E}\bigl[
+(\bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t)
+(\bm{e}_{t|t-1} - \bm{K}_t\tilde{\bm{y}}_t)^\top
+\bigr]
+\Bigr).
 \]
 
-\proofstep{rw}{展开期望：}
+\proofstep{rw}{先把括号展开：}
 
 \[
-\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]
-- \bm{K}_t\mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top]
-= \bm{0}.
+\begin{aligned}
+J(\bm{K}_t)
+=\;&
+\mathrm{tr}\!\Bigl(
+\mathbb{E}[\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top]
+\Bigr) \\
+&-
+\mathrm{tr}\!\Bigl(
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top]\bm{K}_t^\top
+\Bigr) \\
+&-
+\mathrm{tr}\!\Bigl(
+\bm{K}_t\mathbb{E}[\tilde{\bm{y}}_t\bm{e}_{t|t-1}^\top]
+\Bigr) \\
+&+
+\mathrm{tr}\!\Bigl(
+\bm{K}_t\mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top]\bm{K}_t^\top
+\Bigr).
+\end{aligned}
 \]
 
-\proofstep{rw}{把上一节算出来的两个量代进去：}
+\proofstep{rw}{再把前面已经算出来的两个量代入：}
 
 \[
-\bm{P}_{t|t-1}\bm{H}^\top - \bm{K}_t\bm{S}_t = \bm{0}.
+\mathbb{E}[\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top] = \bm{P}_{t|t-1},
+\qquad
+\mathbb{E}[\bm{e}_{t|t-1}\tilde{\bm{y}}_t^\top] = \bm{P}_{t|t-1}\bm{H}^\top,
+\qquad
+\mathbb{E}[\tilde{\bm{y}}_t\tilde{\bm{y}}_t^\top] = \bm{S}_t.
 \]
 
-\proofstep{done}{右乘
-\(\bm{S}_t^{-1}\)
-就得到}
+\proofstep{rw}{于是目标函数变成一个显式的二次型：}
+
+\[
+\begin{aligned}
+J(\bm{K}_t)
+=\;&
+\mathrm{tr}(\bm{P}_{t|t-1})
+- \mathrm{tr}(\bm{P}_{t|t-1}\bm{H}^\top\bm{K}_t^\top) \\
+&- \mathrm{tr}(\bm{K}_t\bm{H}\bm{P}_{t|t-1})
++ \mathrm{tr}(\bm{K}_t\bm{S}_t\bm{K}_t^\top).
+\end{aligned}
+\]
+
+\proofstep{rw}{由于
+\(\mathrm{tr}(\bm{P}_{t|t-1}\bm{H}^\top\bm{K}_t^\top)
+= \mathrm{tr}(\bm{K}_t\bm{H}\bm{P}_{t|t-1})\)，
+前两项可以合并：}
+
+\[
+\begin{aligned}
+J(\bm{K}_t)
+=\;&
+\mathrm{tr}(\bm{P}_{t|t-1})
+- 2\,\mathrm{tr}(\bm{K}_t\bm{H}\bm{P}_{t|t-1}) \\
+&+ \mathrm{tr}(\bm{K}_t\bm{S}_t\bm{K}_t^\top).
+\end{aligned}
+\]
+
+\proofstep{rw}{现在直接对
+\(\bm{K}_t\)
+求导。用到两条标准公式：}
+
+\[
+\frac{\partial}{\partial \bm{K}}
+\mathrm{tr}(\bm{K}\bm{A})
+= \bm{A}^\top,
+\qquad
+\frac{\partial}{\partial \bm{K}}
+\mathrm{tr}(\bm{K}\bm{S}\bm{K}^\top)
+= 2\bm{K}\bm{S}
+\quad(\bm{S}=\bm{S}^\top).
+\]
+
+\proofstep{rw}{因此}
+
+\[
+\frac{\partial J}{\partial \bm{K}_t}
+= -2\bm{P}_{t|t-1}\bm{H}^\top + 2\bm{K}_t\bm{S}_t.
+\]
+
+\proofstep{done}{令导数为 0，就得到}
 
 \[
 \bm{K}_t
