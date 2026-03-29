@@ -1,0 +1,349 @@
+\documentclass[12pt,a4paper]{ctexart}
+\input{preamble.tex}
+
+\title{粒子滤波基础笔记\\
+\large 从 Bayes 递推到重要性采样、重采样与数值算例}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\section{为什么需要粒子滤波}
+
+Kalman filter 的核心优势，是把后验分布压缩成均值与协方差。只要系统近似线性、噪声近似高斯，这种压缩几乎不损失关键信息。
+
+但如果后验分布本身不是单峰高斯，这种压缩就会失真。一个典型场景是：状态 \(x_t\) 是小车位置，观测却是
+\[
+y_t = x_t^2 + v_t,
+\qquad
+v_t \sim \Normal(0,\sigma_y^2).
+\]
+当你测到 \(y_t \approx 9\) 时，\(x_t \approx 3\) 和 \(x_t \approx -3\) 都有可能。后验天然有两个峰，而不是一个峰。此时若仍坚持用单个高斯去近似，就会把两个峰硬压成中间一团。
+
+粒子滤波的基本立场是：既然后验可能很复杂，那就不要强行把它压成一个鼓包，而是直接用一批样本去近似这整个分布。
+
+\section{Bayes 滤波递推：粒子方法要近似的到底是什么}
+
+考虑状态空间模型
+\[
+x_t \sim p(x_t \mid x_{t-1}), \qquad
+y_t \sim p(y_t \mid x_t),
+\]
+其中 \(x_t \in \R^d\) 是隐状态，\(y_t\) 是观测。我们的目标是递推计算后验密度
+\[
+p(x_t \mid y_{1:t}),
+\qquad
+y_{1:t} := (y_1,\dots,y_t).
+\]
+
+\subsection{预测步}
+
+由全概率公式，
+\[
+p(x_t \mid y_{1:t-1})
+= \int p(x_t \mid x_{t-1}) p(x_{t-1} \mid y_{1:t-1}) \, dx_{t-1}.
+\]
+这一步把上一时刻的后验经由状态转移核推到当前，称为预测分布。
+
+\subsection{更新步}
+
+由 Bayes 公式，
+\[
+p(x_t \mid y_{1:t})
+= \frac{p(y_t \mid x_t)\, p(x_t \mid y_{1:t-1})}{p(y_t \mid y_{1:t-1})}.
+\]
+分母只是归一化常数，因此常写成
+\[
+p(x_t \mid y_{1:t})
+\propto p(y_t \mid x_t)\, p(x_t \mid y_{1:t-1}).
+\]
+
+合起来，Bayes 滤波就是一条两步递推：
+\begin{align*}
+\text{预测：}\quad
+p(x_t \mid y_{1:t-1})
+&= \int p(x_t \mid x_{t-1}) p(x_{t-1} \mid y_{1:t-1}) \, dx_{t-1}, \\
+\text{更新：}\quad
+p(x_t \mid y_{1:t})
+&\propto p(y_t \mid x_t)\, p(x_t \mid y_{1:t-1}).
+\end{align*}
+
+难点不在公式，而在于这两个分布通常没有解析表达式。粒子滤波就是对这条递推的数值近似。
+
+\section{用粒子近似分布}
+
+设一批粒子与权重为
+\[
+\{x_t^{(i)}, w_t^{(i)}\}_{i=1}^N,
+\qquad
+w_t^{(i)} \ge 0,\quad \sum_{i=1}^N w_t^{(i)} = 1.
+\]
+粒子滤波用经验测度
+\[
+\pi_t^N(dx)
+= \sum_{i=1}^N w_t^{(i)} \delta_{x_t^{(i)}}(dx)
+\]
+近似目标后验 \(\pi_t(dx) = p(x_t \mid y_{1:t})\,dx\)。这里 \(\delta_{x_t^{(i)}}\) 是在粒子位置上的 Dirac 质量。
+
+于是对任意测试函数 \(\varphi\)，其后验期望可用加权和近似：
+\[
+\E[\varphi(x_t) \mid y_{1:t}]
+= \int \varphi(x)\,\pi_t(dx)
+\approx \sum_{i=1}^N w_t^{(i)} \varphi(x_t^{(i)}).
+\]
+
+特别地，后验均值和二阶矩分别近似为
+\[
+\hat{x}_t \approx \sum_{i=1}^N w_t^{(i)} x_t^{(i)},
+\qquad
+\E[x_t x_t^\top \mid y_{1:t}] \approx \sum_{i=1}^N w_t^{(i)} x_t^{(i)} {x_t^{(i)}}^\top.
+\]
+
+\section{从重要性采样推到权重递推}
+
+\subsection{静态重要性采样}
+
+设目标密度为 \(\pi(x)\)，难以直接采样；提议分布为 \(q(x)\)，容易采样，且 \(q(x) > 0\) 在 \(\pi(x)\) 的支撑上成立。则
+\[
+\E_\pi[\varphi(x)]
+= \int \varphi(x)\pi(x)\,dx
+= \int \varphi(x)\frac{\pi(x)}{q(x)} q(x)\,dx
+= \E_q[\varphi(x)\omega(x)],
+\]
+其中未归一化重要性权重定义为
+\[
+\omega(x) := \frac{\pi(x)}{q(x)}.
+\]
+
+若 \(x^{(i)} \sim q\)，则自归一化估计为
+\[
+\E_\pi[\varphi(x)]
+\approx \sum_{i=1}^N \bar{w}^{(i)} \varphi(x^{(i)}),
+\qquad
+\bar{w}^{(i)} = \frac{\omega(x^{(i)})}{\sum_{j=1}^N \omega(x^{(j)})}.
+\]
+
+\subsection{序贯重要性采样}
+
+在滤波问题中，目标分布随时间变化。设整条状态轨迹为 \(x_{0:t}\)。目标是后验
+\[
+\pi_t(x_{0:t}) := p(x_{0:t} \mid y_{1:t}),
+\]
+而提议分布取作
+\[
+q_t(x_{0:t} \mid y_{1:t})
+= q_{t-1}(x_{0:t-1} \mid y_{1:t-1}) q_t(x_t \mid x_{0:t-1}, y_{1:t}).
+\]
+对应的未归一化权重为
+\[
+\omega_t(x_{0:t})
+= \frac{\pi_t(x_{0:t})}{q_t(x_{0:t} \mid y_{1:t})}.
+\]
+
+利用
+\[
+\pi_t(x_{0:t})
+\propto p(y_t \mid x_t) p(x_t \mid x_{t-1}) \pi_{t-1}(x_{0:t-1}),
+\]
+可得递推形式
+\[
+\omega_t^{(i)}
+\propto \omega_{t-1}^{(i)}
+\frac{p(y_t \mid x_t^{(i)}) p(x_t^{(i)} \mid x_{t-1}^{(i)})}
+{q_t(x_t^{(i)} \mid x_{0:t-1}^{(i)}, y_{1:t})}.
+\]
+这是序贯重要性采样的核心公式。
+
+\subsection{Bootstrap 粒子滤波}
+
+若直接选提议分布
+\[
+q_t(x_t \mid x_{0:t-1}, y_{1:t}) = p(x_t \mid x_{t-1}),
+\]
+则上式中的状态转移项约掉，权重递推大幅简化为
+\[
+\omega_t^{(i)} \propto \omega_{t-1}^{(i)} p(y_t \mid x_t^{(i)}).
+\]
+这就是最经典的 Bootstrap particle filter。它的优点是实现简单；缺点是没有利用当前观测去设计更聪明的提议分布，故在观测很尖锐时容易权重退化。
+
+\section{重采样：为什么必须做，以及怎么判断何时做}
+
+\subsection{权重退化}
+
+如果长时间只做重要性加权，不做重采样，通常会出现少数粒子拥有几乎全部权重，其余粒子权重接近零。此时虽名义上有 \(N\) 个粒子，实际有效样本远小于 \(N\)。
+
+常用诊断量是有效样本数
+\[
+\ess
+:= \frac{1}{\sum_{i=1}^N (w_t^{(i)})^2}.
+\]
+若所有权重都相等，则 \(\ess = N\)；若一个粒子独占全部权重，则 \(\ess = 1\)。
+
+\subsection{重采样的数学作用}
+
+重采样把带权粒子
+\[
+\{x_t^{(i)}, w_t^{(i)}\}_{i=1}^N
+\]
+转换为等权粒子
+\[
+\{\tilde{x}_t^{(i)}, 1/N\}_{i=1}^N
+\]
+并满足
+\[
+\E\!\left[\frac{1}{N}\sum_{i=1}^N \varphi(\tilde{x}_t^{(i)})
+\Bigm| \{x_t^{(j)},w_t^{(j)}\}_{j=1}^N \right]
+= \sum_{j=1}^N w_t^{(j)} \varphi(x_t^{(j)}).
+\]
+也就是说，重采样在条件期望意义下不改变经验测度，但会牺牲多样性并引入额外方差。
+
+\subsection{常见选择}
+
+最简单的是 multinomial resampling。它直观，但方差偏大。实践中常用 systematic 或 stratified resampling，以降低采样方差。
+
+\section{完整算法}
+
+Bootstrap 粒子滤波可写成下述步骤：
+
+\begin{enumerate}
+  \item 初始采样：\(x_0^{(i)} \sim p(x_0)\)，令 \(w_0^{(i)} = 1/N\)。
+  \item 预测：对每个粒子采样
+  \[
+  x_t^{(i)} \sim p(x_t \mid x_{t-1}^{(i)}).
+  \]
+  \item 加权：计算未归一化权重
+  \[
+  \omega_t^{(i)} = w_{t-1}^{(i)} p(y_t \mid x_t^{(i)}),
+  \]
+  再归一化成 \(w_t^{(i)}\)。
+  \item 若 \(\ess < N_{\mathrm{thres}}\)，则重采样并把权重重置为 \(1/N\)。
+\end{enumerate}
+
+\section{算例一：双峰观测下的权重更新}
+
+本节故意选一个一维、离散而短小的例子，用来手算权重。
+
+\subsection{模型设定}
+
+设当前时刻的预测粒子位置为
+\[
+x_t^{(1)}=-3,\quad x_t^{(2)}=-1,\quad x_t^{(3)}=1,\quad x_t^{(4)}=3,
+\]
+预测后它们等权，即 \(w_{t|t-1}^{(i)} = 1/4\)。
+
+观测模型取为
+\[
+y_t = x_t^2 + v_t,\qquad v_t \sim \Normal(0,1).
+\]
+现在观测到 \(y_t = 9\)。
+
+\subsection{逐个计算似然}
+
+由高斯似然，
+\[
+p(y_t=9 \mid x_t^{(i)})
+\propto \exp\!\left(-\frac{(9-(x_t^{(i)})^2)^2}{2}\right).
+\]
+四个粒子的平方分别为 \(9,1,1,9\)，故未归一化权重与
+\[
+\exp(0),\ \exp(-32),\ \exp(-32),\ \exp(0)
+\]
+成正比。记 \(a=\exp(-32)\approx 1.27\times 10^{-14}\)，则归一化后
+\[
+w_t^{(1)} = \frac{1}{2+2a}\approx \frac{1}{2},
+\qquad
+w_t^{(4)} = \frac{1}{2+2a}\approx \frac{1}{2},
+\]
+\[
+w_t^{(2)} = w_t^{(3)} = \frac{a}{2+2a}\approx 6.35\times 10^{-15}.
+\]
+
+\subsection{这组数字说明了什么}
+
+更新后，后验几乎完全集中在 \(-3\) 与 \(3\) 两个粒子上。这个结果非常重要：粒子滤波没有把答案压成 \(0\)，而是保留了两个对称峰。若此时用单个高斯去拟合后验，均值会落在 \(0\) 附近，但 \(0\) 恰好是观测最不支持的位置之一。
+
+\subsection{有效样本数}
+
+此时
+\[
+\ess
+= \frac{1}{2(1/2)^2 + 2(6.35\times 10^{-15})^2}
+\approx 2.
+\]
+虽然共有 \(4\) 个粒子，但有效样本数约为 \(2\)。继续迭代后若退化加重，就应触发重采样。
+
+\section{算例二：一维非线性运动的两步递推}
+
+上一节只手算了一次更新；这一节写出一个完整的预测-更新-重采样回合。
+
+\subsection{模型}
+
+取状态模型
+\[
+x_t = \frac{1}{2}x_{t-1} + w_t,\qquad w_t \sim \Normal(0,1),
+\]
+观测模型
+\[
+y_t = x_t^2 + v_t,\qquad v_t \sim \Normal(0,1).
+\]
+假设上一时刻重采样后得到四个等权粒子
+\[
+x_{t-1}^{(1)}=-4,\quad x_{t-1}^{(2)}=-2,\quad x_{t-1}^{(3)}=2,\quad x_{t-1}^{(4)}=4.
+\]
+
+\subsection{预测}
+
+为了算例简单，假设一次实际采样结果恰为
+\[
+x_t^{(1)}=-3,\quad x_t^{(2)}=-1,\quad x_t^{(3)}=1,\quad x_t^{(4)}=3.
+\]
+这组值与状态方程是相容的，因为对应噪声样本分别为 \(-1,0,0,1\)。
+
+\subsection{更新}
+
+若观测仍是 \(y_t=9\)，则权重就是上一节算出的结果，近似为
+\[
+\left(\frac{1}{2},\,0,\,0,\,\frac{1}{2}\right).
+\]
+
+\subsection{重采样}
+
+若做 multinomial resampling，则新粒子会以概率 \(1/2\) 从 \(-3\) 和 \(3\) 中抽取。一次可能的重采样结果为
+\[
+\tilde{x}_t^{(1)}=-3,\quad
+\tilde{x}_t^{(2)}=-3,\quad
+\tilde{x}_t^{(3)}=3,\quad
+\tilde{x}_t^{(4)}=3.
+\]
+这说明重采样虽把权重重新拉平，但也明显减少了粒子多样性。这正是后续很多改进方法想要处理的问题。
+
+\section{实现时真正要盯的量}
+
+\subsection{粒子数 \(N\)}
+
+\(N\) 太小时，后验分布会被表示得过于粗糙；\(N\) 太大时，计算开销上升。没有万能公式，通常只能依据维度、观测尖锐程度和实时性要求去调。
+
+\subsection{提议分布}
+
+Bootstrap 方案最简单，但不是最优。若观测很强，应该尝试设计更靠近后验的提议分布，否则权重容易一轮就塌。
+
+\subsection{重采样阈值}
+
+常见做法是在 \(\ess < N/2\) 或 \(\ess < 0.3N\) 时重采样。阈值过高会导致频繁重采样、样本贫化；阈值过低则权重退化严重。
+
+\section{如果只记住几句话}
+
+\begin{enumerate}
+  \item 粒子滤波是在近似整条 Bayes 滤波递推，而不是只在做“随机采样”。
+  \item 它用经验测度去逼近后验，因此天然可以表示多峰和强非线性。
+  \item 重要性采样给出了权重公式，重采样则是在控制权重退化。
+  \item 它的根本代价是：表达能力来自大量样本，算力与退化问题永远绕不开。
+\end{enumerate}
+
+\paragraph{后续关系}
+在这份基础笔记之后，粒子滤波还可以与最优输运或神经网络结合。但那是两条不同扩展线，应分别讨论，而不应混在一篇里。
+
+\end{document}

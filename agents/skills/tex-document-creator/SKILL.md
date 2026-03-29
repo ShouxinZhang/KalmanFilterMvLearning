@@ -33,6 +33,7 @@ description: 创建或修改 TeX/LaTeX 文档。适用于新建中文笔记、�
 ## 写作要求
 
 - 若任务是“通俗解释论文/方法”，优先参考 `references/research-paper-simplifier.md`。
+- 若任务是“解释一个技术方法并保留推导”，再参考 `references/method-note-writing.md`。
 - 非必要不解释 LaTeX 常识；把上下文留给具体任务。
 - `hyperref` 开着时，标题里尽量不要直接塞复杂数学公式。
 
@@ -41,3 +42,4 @@ description: 创建或修改 TeX/LaTeX 文档。适用于新建中文笔记、�
 - 新建脚手架：`scripts/scaffold_tex_document.sh`
 - 补充约定：`references/layout-and-build.md`
 - 论文通俗解释风格：`references/research-paper-simplifier.md`
+- 方法型技术笔记写法：`references/method-note-writing.md`
