@@ -21,9 +21,9 @@ y_t = x_t^2 + v_t,
 \qquad
 v_t \sim \Normal(0,\sigma_y^2).
 \]
-当你测到 \(y_t \approx 9\) 时，\(x_t \approx 3\) 和 \(x_t \approx -3\) 都有可能。后验天然有两个峰，而不是一个峰。此时若仍坚持用单个高斯去近似，就会把两个峰硬压成中间一团。
+当你测到 \(y_t \approx 9\) 时，\(x_t \approx 3\) 和 \(x_t \approx -3\) 都有可能。后验天然呈现双峰结构，而不是单峰结构。此时若仍坚持用单个高斯去近似，就会把两个峰强行压缩为中间的一团分布。
 
-粒子滤波的基本立场是：既然后验可能很复杂，那就不要强行把它压成一个鼓包，而是直接用一批样本去近似这整个分布。
+粒子滤波的基本立场是：既然后验可能具有复杂结构，就不应强行将其压缩为单一的简单分布，而应直接用一批样本去近似整个后验。
 
 \section{Bayes 滤波递推：粒子方法要近似的到底是什么}
 
@@ -32,25 +32,137 @@ v_t \sim \Normal(0,\sigma_y^2).
 x_t \sim p(x_t \mid x_{t-1}), \qquad
 y_t \sim p(y_t \mid x_t),
 \]
-其中 \(x_t \in \R^d\) 是隐状态，\(y_t\) 是观测。我们的目标是递推计算后验密度
+其中状态空间记为 \(\mathcal X \subseteq \R^d\)，\(x_t \in \mathcal X\) 是隐状态，\(y_t\) 是观测。我们的目标是递推计算后验密度
 \[
 p(x_t \mid y_{1:t}),
 \qquad
 y_{1:t} := (y_1,\dots,y_t).
 \]
 
+\subsection{先看两个朴素例子}
+
+如果一上来就看积分式，读者通常不知道自己到底在算什么。更好的方式，是先看一个离散例子，再看一个连续例子。
+
+\paragraph{例 1：离散状态，其实就是“把所有旧状态的贡献加起来”}
+设小车此刻只可能在两个路口：左路口 \(L\) 或右路口 \(R\)。上一时刻后验为
+\[
+\mathbb{P}(x_{t-1}=L \mid y_{1:t-1}) = 0.7,
+\qquad
+\mathbb{P}(x_{t-1}=R \mid y_{1:t-1}) = 0.3.
+\]
+状态转移满足
+\[
+\mathbb{P}(x_t=L \mid x_{t-1}=L)=0.8,
+\qquad
+\mathbb{P}(x_t=L \mid x_{t-1}=R)=0.2.
+\]
+那么由附录~\hyperref[app:total-prob]{全概率公式}的离散求和版，
+\[
+\mathbb{P}(x_t=L \mid y_{1:t-1})
+= \sum_{x_{t-1}\in\{L,R\}}
+\mathbb{P}(x_t=L \mid x_{t-1})\,
+\mathbb{P}(x_{t-1} \mid y_{1:t-1}),
+\]
+于是
+\[
+\mathbb{P}(x_t=L \mid y_{1:t-1})
+= 0.8\times 0.7 + 0.2\times 0.3
+= 0.62.
+\]
+这说明预测步并不神秘，本质上只是把“所有可能的旧状态”都过一遍，然后把它们对当前状态的贡献加起来。
+
+现在假设传感器在时刻 \(t\) 给出观测 \(y_t\)，且似然为
+\[
+\mathbb{P}(y_t \mid x_t=L)=0.9,
+\qquad
+\mathbb{P}(y_t \mid x_t=R)=0.2.
+\]
+那么由附录~\hyperref[app:bayes-formula]{Bayes 公式}，
+\[
+\mathbb{P}(x_t=L \mid y_{1:t})
+\propto
+\mathbb{P}(y_t \mid x_t=L)\,
+\mathbb{P}(x_t=L \mid y_{1:t-1})
+= 0.9\times 0.62 = 0.558,
+\]
+\[
+\mathbb{P}(x_t=R \mid y_{1:t})
+\propto
+0.2\times 0.38 = 0.076.
+\]
+归一化后，
+\[
+\mathbb{P}(x_t=L \mid y_{1:t})
+= \frac{0.558}{0.558+0.076}
+\approx 0.88,
+\qquad
+\mathbb{P}(x_t=R \mid y_{1:t})
+\approx 0.12.
+\]
+这就是更新步：先看预测分布，再用新观测重新分配可信度。
+
+\paragraph{例 2：连续状态，其实就是“把所有旧位置的贡献累加起来”}
+现在把状态改成连续位置。设上一时刻我们认为小车位置 \(x_{t-1}\) 在区间 \([4,6]\) 上均匀分布，即
+\[
+p(x_{t-1} \mid y_{1:t-1})
+=
+\begin{cases}
+\frac12, & x_{t-1}\in[4,6],\\
+0, & \text{其他}.
+\end{cases}
+\]
+又设运动模型是
+\[
+x_t = x_{t-1} + w_t,
+\qquad
+w_t \sim \mathrm{Unif}[0,1],
+\]
+于是转移密度为
+\[
+p(x_t \mid x_{t-1})
+=
+\begin{cases}
+1, & x_t\in[x_{t-1},\,x_{t-1}+1],\\
+0, & \text{其他}.
+\end{cases}
+\]
+这时若想算预测密度在 \(x_t=6\) 处的值，由附录~\hyperref[app:total-prob]{全概率公式}，
+\[
+p(x_t=6 \mid y_{1:t-1})
+= \int_{\mathcal X} p(6 \mid x_{t-1})\, p(x_{t-1} \mid y_{1:t-1})\, dx_{t-1}.
+\]
+只有 \(x_{t-1}\in[5,6]\) 时，核 \(p(6 \mid x_{t-1})\) 才不为零，因此
+\[
+p(x_t=6 \mid y_{1:t-1})
+= \int_{5}^{6} 1\cdot \frac12\, dx_{t-1}
+= \frac12.
+\]
+同理，
+\[
+p(x_t=4.5 \mid y_{1:t-1})
+= \int_{4}^{4.5} 1\cdot \frac12\, dx_{t-1}
+= \frac14.
+\]
+这说明连续情形下，积分并不是额外的神秘操作；它只是把“所有可能的旧位置”对当前点 \(x_t\) 的贡献连续地累加起来。收到观测后，再按
+\[
+p(x_t \mid y_{1:t})
+\propto
+p(y_t \mid x_t)\, p(x_t \mid y_{1:t-1})
+\]
+把靠近观测的位置抬高、把远离观测的位置压低，这就是连续版的更新。
+
 \subsection{预测步}
 
-由全概率公式，
+由附录~\hyperref[app:total-prob]{全概率公式}，
 \[
 p(x_t \mid y_{1:t-1})
-= \int p(x_t \mid x_{t-1}) p(x_{t-1} \mid y_{1:t-1}) \, dx_{t-1}.
+= \int_{\mathcal X} p(x_t \mid x_{t-1}) p(x_{t-1} \mid y_{1:t-1}) \, dx_{t-1}.
 \]
 这一步把上一时刻的后验经由状态转移核推到当前，称为预测分布。
 
 \subsection{更新步}
 
-由 Bayes 公式，
+由附录~\hyperref[app:bayes-formula]{Bayes 公式}，
 \[
 p(x_t \mid y_{1:t})
 = \frac{p(y_t \mid x_t)\, p(x_t \mid y_{1:t-1})}{p(y_t \mid y_{1:t-1})}.
@@ -65,7 +177,7 @@ p(x_t \mid y_{1:t})
 \begin{align*}
 \text{预测：}\quad
 p(x_t \mid y_{1:t-1})
-&= \int p(x_t \mid x_{t-1}) p(x_{t-1} \mid y_{1:t-1}) \, dx_{t-1}, \\
+&= \int_{\mathcal X} p(x_t \mid x_{t-1}) p(x_{t-1} \mid y_{1:t-1}) \, dx_{t-1}, \\
 \text{更新：}\quad
 p(x_t \mid y_{1:t})
 &\propto p(y_t \mid x_t)\, p(x_t \mid y_{1:t-1}).
@@ -74,6 +186,8 @@ p(x_t \mid y_{1:t})
 难点不在公式，而在于这两个分布通常没有解析表达式。粒子滤波就是对这条递推的数值近似。
 
 \section{用粒子近似分布}
+
+如果你之前没系统学过 \(\pi_t^N\)、Dirac 质量、经验测度、先验/预测/后验分布这些术语，可以先跳到附录~\hyperref[app:notation]{术语与记号速查}；那一节专门解释这些词到底是什么意思，以及通常在哪些课程里第一次见到。
 
 设一批粒子与权重为
 \[
@@ -86,12 +200,12 @@ w_t^{(i)} \ge 0,\quad \sum_{i=1}^N w_t^{(i)} = 1.
 \pi_t^N(dx)
 = \sum_{i=1}^N w_t^{(i)} \delta_{x_t^{(i)}}(dx)
 \]
-近似目标后验 \(\pi_t(dx) = p(x_t \mid y_{1:t})\,dx\)。这里 \(\delta_{x_t^{(i)}}\) 是在粒子位置上的 Dirac 质量。
+近似目标后验 \(\pi_t(dx) = p(x_t \mid y_{1:t})\,dx\)。这里 \(\delta_{x_t^{(i)}}\) 是在粒子位置上的 Dirac 质量。若想先看两个直接可算的“近似后验”例子，可跳到附录~\hyperref[app:posterior-examples]{近似后验的两个朴素例子}。
 
 于是对任意测试函数 \(\varphi\)，其后验期望可用加权和近似：
 \[
 \E[\varphi(x_t) \mid y_{1:t}]
-= \int \varphi(x)\,\pi_t(dx)
+= \int_{\mathcal X} \varphi(x)\,\pi_t(dx)
 \approx \sum_{i=1}^N w_t^{(i)} \varphi(x_t^{(i)}).
 \]
 
@@ -109,8 +223,8 @@ w_t^{(i)} \ge 0,\quad \sum_{i=1}^N w_t^{(i)} = 1.
 设目标密度为 \(\pi(x)\)，难以直接采样；提议分布为 \(q(x)\)，容易采样，且 \(q(x) > 0\) 在 \(\pi(x)\) 的支撑上成立。则
 \[
 \E_\pi[\varphi(x)]
-= \int \varphi(x)\pi(x)\,dx
-= \int \varphi(x)\frac{\pi(x)}{q(x)} q(x)\,dx
+= \int_{\mathcal X} \varphi(x)\pi(x)\,dx
+= \int_{\mathcal X} \varphi(x)\frac{\pi(x)}{q(x)} q(x)\,dx
 = \E_q[\varphi(x)\omega(x)],
 \]
 其中未归一化重要性权重定义为
@@ -345,5 +459,204 @@ Bootstrap 方案最简单，但不是最优。若观测很强，应该尝试设�
 
 \paragraph{后续关系}
 在这份基础笔记之后，粒子滤波还可以与最优输运或神经网络结合。但那是两条不同扩展线，应分别讨论，而不应混在一篇里。
+
+\appendix
+
+\section{术语与记号速查}\label{app:notation}
+
+\subsection{这些东西通常在哪些课程里第一次见到}
+
+如果按课程来源粗分，大致是这样：
+\begin{enumerate}
+  \item 概率论与数理统计：先验、后验、条件概率密度、Bayes 公式。
+  \item 随机过程或状态估计：状态空间模型、预测分布、滤波递推。
+  \item 测度论概率或更理论化的概率课：Dirac 质量、测度、经验测度这类写法。
+  \item Monte Carlo / 统计计算：重要性采样、粒子系统、经验分布近似。
+\end{enumerate}
+
+所以如果你之前主要学的是“随机变量 + 密度函数 + 期望”那一套，而没正式学过测度论，那么 \(\pi_t^N(dx)\) 这种写法看着陌生是完全正常的。
+
+\subsection{\(\pi_t\) 与 \(\pi_t^N\) 到底是什么}
+
+这里的 \(\pi_t\) 只是“时刻 \(t\) 的目标后验分布”的另一种写法。连续情形下，它对应
+\[
+\pi_t(dx) = p(x_t \mid y_{1:t})\,dx.
+\]
+
+而 \(\pi_t^N\) 表示“用 \(N\) 个粒子构造出来的近似分布”：
+\[
+\pi_t^N(dx)
+= \sum_{i=1}^N w_t^{(i)} \delta_{x_t^{(i)}}(dx).
+\]
+
+这里上标 \(N\) 不是幂次，而是在提醒你：这个对象依赖于粒子数 \(N\)。\(N\) 变大时，通常希望 \(\pi_t^N\) 越来越接近真正的后验 \(\pi_t\)。
+
+\subsection{Dirac 质量是什么}
+
+\(\delta_a\) 表示“把全部质量都压在点 \(a\) 上”的分布，也叫 Dirac 质量或点质量。最核心的特征是：对任意测试函数 \(\varphi\)，都有
+\[
+\int_{\mathcal X} \varphi(x)\,\delta_a(dx) = \varphi(a).
+\]
+
+如果你暂时不想碰测度论，可以把它粗略理解成：
+\begin{quote}
+\(\delta_a\) 就是在说“这个随机量不散开，它只取点 \(a\)”。
+\end{quote}
+
+所以
+\[
+\sum_{i=1}^N w_t^{(i)} \delta_{x_t^{(i)}}
+\]
+的意思就是：把权重 \(w_t^{(i)}\) 分配给点 \(x_t^{(i)}\)，从而得到一个“由很多带权点组成的分布”。
+
+\subsection{经验测度是什么}
+
+经验测度这个词听上去抽象，其实只是“把样本云写成分布对象”。
+
+例如，若有三个等权样本
+\[
+2,\ 5,\ 9,
+\]
+那么对应的经验测度就是
+\[
+\frac13 \delta_2 + \frac13 \delta_5 + \frac13 \delta_9.
+\]
+
+它的意义是：以后你要算均值、方差或任意函数的期望时，不必每次都口头说“对三个样本取平均”，而可以统一写成“对经验测度积分”。比如
+\[
+\int_{\mathcal X} x\,
+\left(
+\frac13 \delta_2 + \frac13 \delta_5 + \frac13 \delta_9
+\right)(dx)
+= \frac{2+5+9}{3}.
+\]
+
+因此，粒子滤波里的经验测度不是新物理对象，只是把“粒子 + 权重”这堆东西打包成一个分布。
+
+\subsection{先验、预测、后验分别是什么}
+
+这三个概念彼此接近，但含义并不相同。
+
+\begin{enumerate}
+  \item 先验：在尚未利用当前观测之前，对状态所持有的分布性认识。
+  \item 预测分布：把上一时刻后验通过状态转移推到当前时刻后得到的分布，即 \(p(x_t \mid y_{1:t-1})\)。
+  \item 后验：融合了当前观测之后的分布，即 \(p(x_t \mid y_{1:t})\)。
+\end{enumerate}
+
+在滤波语境里，可以将三者的关系概括为：
+\begin{quote}
+先由上一时刻信息形成预测分布，再结合当前观测完成后验更新。
+\end{quote}
+
+\subsection{为什么正文里要用这些写法}
+
+因为粒子滤波的本质不是只计算单个数值，而是在递推整条分布。只要关心的不仅是均值，而是完整的不确定性结构，那么 \(\pi_t\)、\(\pi_t^N\)、\(\delta_a\) 这一套写法会比单独书写密度函数更紧凑，也更适合同时处理离散与连续情形。
+
+\subsection{近似后验的两个朴素例子}\label{app:posterior-examples}
+
+\paragraph{例 1：离散状态时，近似后验就是带权计数}
+设状态空间只有三个位置
+\[
+\mathcal X = \{A,B,C\}.
+\]
+假设真实后验为
+\[
+\pi_t(\{A\})=0.1,\qquad
+\pi_t(\{B\})=0.3,\qquad
+\pi_t(\{C\})=0.6.
+\]
+
+现在若粒子滤波给出 \(N=5\) 个等权粒子
+\[
+C,\ C,\ B,\ C,\ A,
+\]
+则经验测度就是
+\[
+\pi_t^5
+= \frac15 \delta_A + \frac15 \delta_B + \frac35 \delta_C.
+\]
+
+这时它对三个状态给出的近似概率分别是
+\[
+\pi_t^5(\{A\})=\frac15,\qquad
+\pi_t^5(\{B\})=\frac15,\qquad
+\pi_t^5(\{C\})=\frac35.
+\]
+
+它与真实后验
+\[
+(0.1,\ 0.3,\ 0.6)
+\]
+并不完全相同，但已经抓住了最主要的结构：状态 \(C\) 概率最大，状态 \(A\) 最小。这里“近似后验”没有任何神秘之处，本质上就是“看有多少粒子落在各个状态上”。
+
+\paragraph{例 2：连续状态时，近似后验就是带权点去逼近平滑分布}
+现在设状态是连续位置，真实后验是一条平滑密度曲线，例如大致集中在 \(x=2\) 附近。粒子滤波给出三个带权粒子
+\[
+x_t^{(1)}=0,\qquad x_t^{(2)}=2,\qquad x_t^{(3)}=3,
+\]
+\[
+w_t^{(1)}=0.2,\qquad w_t^{(2)}=0.5,\qquad w_t^{(3)}=0.3.
+\]
+那么近似后验写成
+\[
+\pi_t^3(dx)
+= 0.2\,\delta_0(dx)+0.5\,\delta_2(dx)+0.3\,\delta_3(dx).
+\]
+
+这不表示真实后验真的只在 \(0,2,3\) 三个点取值，而是表示：
+\begin{quote}
+我们暂时只用这三个带权点来代表整条连续后验曲线。
+\end{quote}
+
+例如，它给出的后验均值近似为
+\[
+\int_{\mathcal X} x\,\pi_t^3(dx)
+= 0.2\times 0 + 0.5\times 2 + 0.3\times 3
+= 1.9.
+\]
+
+若要近似区间 \([1.5,3.5]\) 上的后验概率，则只需把落在区间内的粒子权重相加：
+\[
+\pi_t^3([1.5,3.5]) \approx 0.5+0.3=0.8.
+\]
+
+因此，连续情形下所谓“近似后验”，本质上就是：真实对象是一条连续密度曲线，而计算机里我们改用有限个带权点来替代它，并用这些权重去近似均值、区间概率和其他期望量。
+
+\section{基础概率公式附录}
+
+\subsection{全概率公式}\label{app:total-prob}
+
+设 \(X\) 与 \(Y\) 具有联合密度 \(p(x,y)\)，其中 \(x \in \mathcal X\)。则边缘密度可由条件密度积分得到：
+\[
+p(y) = \int_{\mathcal X} p(y \mid x)\, p(x)\, dx.
+\]
+
+在条件化情形下，如果再给定一个额外信息集 \(\mathcal G\)，同样有
+\[
+p(y \mid \mathcal G)
+= \int_{\mathcal X} p(y \mid x,\mathcal G)\, p(x \mid \mathcal G)\, dx.
+\]
+
+粒子滤波预测步正是在 \(\mathcal G = y_{1:t-1}\) 的条件下，对上式的直接应用。
+
+\subsection{Bayes 公式}\label{app:bayes-formula}
+
+在同样设定下，若 \(p(y) > 0\)，则后验密度满足
+\[
+p(x \mid y) = \frac{p(y \mid x)\, p(x)}{p(y)}.
+\]
+其中分母也可以借助全概率公式写成
+\[
+p(y) = \int_{\mathcal X} p(y \mid x)\, p(x)\, dx.
+\]
+
+若给定额外信息集 \(\mathcal G\)，则条件版 Bayes 公式为
+\[
+p(x \mid y,\mathcal G)
+= \frac{p(y \mid x,\mathcal G)\, p(x \mid \mathcal G)}
+{p(y \mid \mathcal G)}.
+\]
+
+粒子滤波更新步对应的是 \(\mathcal G = y_{1:t-1}\) 的特殊情形。
 
 \end{document}
