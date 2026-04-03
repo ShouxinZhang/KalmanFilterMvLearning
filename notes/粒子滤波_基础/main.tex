@@ -183,7 +183,7 @@ p(x_t \mid y_{1:t})
 &\propto p(y_t \mid x_t)\, p(x_t \mid y_{1:t-1}).
 \end{align*}
 
-难点不在公式，而在于这两个分布通常没有解析表达式。粒子滤波就是对这条递推的数值近似。
+难点不在公式，而在于这两个分布通常没有解析表达式。粒子滤波就是对这条递推的数值近似。若希望看“为什么这种数值近似会沿时间递推下去”的严格说明，可跳到附录~\hyperref[app:bayes-recursion]{为什么粒子滤波能够跟踪时间演化的后验分布}。
 
 \section{用粒子近似分布}
 
@@ -202,18 +202,27 @@ w_t^{(i)} \ge 0,\quad \sum_{i=1}^N w_t^{(i)} = 1.
 \]
 近似目标后验 \(\pi_t(dx) = p(x_t \mid y_{1:t})\,dx\)。这里 \(\delta_{x_t^{(i)}}\) 是在粒子位置上的 Dirac 质量。若想先看两个直接可算的“近似后验”例子，可跳到附录~\hyperref[app:posterior-examples]{近似后验的两个朴素例子}。
 
-于是对任意测试函数 \(\varphi\)，其后验期望可用加权和近似：
+于是对任意测试函数 \(\varphi\)，粒子系统自然诱导出一个后验期望的数值估计量：
 \[
-\E[\varphi(x_t) \mid y_{1:t}]
-= \int_{\mathcal X} \varphi(x)\,\pi_t(dx)
-\approx \sum_{i=1}^N w_t^{(i)} \varphi(x_t^{(i)}).
+\widehat{I}_t^N(\varphi)
+:=
+\int_{\mathcal X} \varphi(x)\,\pi_t^N(dx)
+=
+\sum_{i=1}^N w_t^{(i)} \varphi(x_t^{(i)}).
 \]
+这个定义之所以重要，是因为滤波并不只关心“分布存在”，还关心如何从分布里提取可计算的量。最常见的两个量，是后验均值与二阶矩；前者给出位置型估计，后者则进一步进入方差、协方差和不确定性分析。关于这里两个等号为何成立，以及它与真实后验期望之间究竟是什么关系，可跳到附录~\hyperref[app:expectation-approx]{后验期望为何写成积分，以及粒子估计量为何逼近真实后验期望}。
 
-特别地，后验均值和二阶矩分别近似为
+因此，在 \(\varphi(x)=x\) 和 \(\varphi(x)=xx^\top\) 两个最常用的选择下，自然得到如下粒子估计量：
 \[
-\hat{x}_t \approx \sum_{i=1}^N w_t^{(i)} x_t^{(i)},
+\widehat{m}_t^N := \sum_{i=1}^N w_t^{(i)} x_t^{(i)},
 \qquad
-\E[x_t x_t^\top \mid y_{1:t}] \approx \sum_{i=1}^N w_t^{(i)} x_t^{(i)} {x_t^{(i)}}^\top.
+\widehat{M}_t^N := \sum_{i=1}^N w_t^{(i)} x_t^{(i)} {x_t^{(i)}}^\top.
+\]
+它们分别用来估计
+\[
+\E[x_t \mid y_{1:t}],
+\qquad
+\E[x_t x_t^\top \mid y_{1:t}].
 \]
 
 \section{从重要性采样推到权重递推}
@@ -270,6 +279,7 @@ q_t(x_{0:t} \mid y_{1:t})
 {q_t(x_t^{(i)} \mid x_{0:t-1}^{(i)}, y_{1:t})}.
 \]
 这是序贯重要性采样的核心公式。
+如果此时还分不清“状态转移分布、提议分布、后验分布”三者各自扮演什么角色，可先跳到附录~\hyperref[app:proposal-2d]{二维数值例子：状态转移分布、提议分布与后验分布的区别}；那一节专门用一个二维高斯例子把三者拆开比较。
 
 \subsection{Bootstrap 粒子滤波}
 
@@ -312,7 +322,7 @@ q_t(x_t \mid x_{0:t-1}, y_{1:t}) = p(x_t \mid x_{t-1}),
 \Bigm| \{x_t^{(j)},w_t^{(j)}\}_{j=1}^N \right]
 = \sum_{j=1}^N w_t^{(j)} \varphi(x_t^{(j)}).
 \]
-也就是说，重采样在条件期望意义下不改变经验测度，但会牺牲多样性并引入额外方差。
+这说明：在给定当前带权粒子的条件下，重采样后的等权经验平均至少在条件期望层面保持不变。之所以此处要强调这一点，是因为重采样虽然会复制和删除粒子，但我们仍希望它不要系统性地扭曲当前已经形成的后验统计量。关于这一条件期望公式为何成立，以及它为什么并不意味着“信息完全不损失”，可跳到附录~\hyperref[app:resampling-unbiased]{重采样为何保持条件期望不变}。
 
 \subsection{常见选择}
 
@@ -621,6 +631,683 @@ w_t^{(1)}=0.2,\qquad w_t^{(2)}=0.5,\qquad w_t^{(3)}=0.3.
 \]
 
 因此，连续情形下所谓“近似后验”，本质上就是：真实对象是一条连续密度曲线，而计算机里我们改用有限个带权点来替代它，并用这些权重去近似均值、区间概率和其他期望量。
+
+\paragraph{对应的最小 Python 脚本}
+如果不想手算，这两个量也可以直接用一个最小脚本算出来。仓库里附了
+\href{run:examples/simple_particle_demo.py}{\nolinkurl{examples/simple_particle_demo.py}}，
+运行方式是：
+\begin{quote}
+\nolinkurl{python notes/粒子滤波_基础/examples/simple_particle_demo.py}
+\end{quote}
+这个脚本会直接输出：
+\begin{enumerate}
+  \item 带权粒子的后验均值估计；
+  \item 二阶矩估计；
+  \item 区间 \([1.5,3.5]\) 的后验概率估计；
+  \item 一次 multinomial resampling 的具体结果。
+\end{enumerate}
+因此读者既可以跟着附录手算，也可以立即用代码核对。
+
+\subsection{二维数值例子：状态转移分布、提议分布与后验分布的区别}\label{app:proposal-2d}
+
+这三个对象最容易混淆，因此单独给一个二维例子。
+
+\paragraph{模型设定}
+为了只研究这三个分布的角色区别，我们先把上一时刻状态固定为
+\[
+x_{t-1} = \begin{bmatrix}0\\0\end{bmatrix}.
+\]
+设系统动力学给出的状态转移分布为
+\[
+p(x_t \mid x_{t-1})
+= \Normal\!\left(
+\begin{bmatrix}1\\1\end{bmatrix},
+I_2
+\right).
+\]
+这表示：如果只看系统运动规律，不看当前观测，那么下一时刻状态大致在 \((1,1)\) 附近，且不确定性较大。
+
+当前观测模型取为
+\[
+y_t \mid x_t \sim \Normal(x_t,\,0.04\,I_2),
+\qquad
+y_t=
+\begin{bmatrix}
+2.8\\
+2.6
+\end{bmatrix}.
+\]
+这表示观测非常集中，强烈支持 \(x_t\) 靠近 \((2.8,2.6)\)。
+
+\paragraph{第一步：状态转移分布在说什么}
+状态转移分布
+\[
+p(x_t \mid x_{t-1})
+\]
+只回答一个问题：
+\begin{quote}
+如果暂时不看当前观测，系统本身倾向于怎样运动？
+\end{quote}
+在这个例子里，它把大量质量放在 \((1,1)\) 附近，因此这是系统先验上的“自然推进方向”。
+
+\paragraph{第二步：后验分布在说什么}
+真正想逼近的对象是后验分布
+\[
+p(x_t \mid y_t,x_{t-1})
+\propto
+p(y_t \mid x_t)\,p(x_t \mid x_{t-1}).
+\]
+由于这里转移与观测都是高斯，后验仍然是高斯，而且可以直接算出
+\[
+p(x_t \mid y_t,x_{t-1})
+=
+\Normal\!\left(
+\begin{bmatrix}
+2.7308\\
+2.5385
+\end{bmatrix},
+\frac{1}{26}I_2
+\right).
+\]
+所以后验的中心已经明显从 \((1,1)\) 被拉向了观测附近。这说明：后验不是单纯的“系统如何运动”，而是“系统运动规律与当前观测共同作用后的结果”。
+
+\paragraph{第三步：提议分布在说什么}
+提议分布
+\[
+q_t(x_t \mid x_{t-1},y_t)
+\]
+回答的不是“世界如何运动”，也不是“真实后验是什么”，而是：
+\begin{quote}
+算法实际准备从哪里抽样来生成候选粒子？
+\end{quote}
+因此它是算法设计对象，而不是物理真相本身。
+
+\paragraph{第四步：Bootstrap 提议为何容易退化}
+若直接取 Bootstrap 提议
+\[
+q_{\mathrm{boot}}(x_t \mid x_{t-1},y_t)
+= p(x_t \mid x_{t-1}),
+\]
+也就是直接拿状态转移分布来采样。那么一组可能的二维粒子为
+\[
+(0.2,1.4),\quad (1.1,0.3),\quad (2.0,1.8),\quad (-0.1,0.7).
+\]
+由于此时 \(q_{\mathrm{boot}}=p(x_t\mid x_{t-1})\)，归一化前权重只与似然
+\[
+p(y_t \mid x_t^{(i)})
+\]
+成正比。数值上，归一化权重几乎变成
+\[
+(0,\ 0,\ 1,\ 0).
+\]
+对应的有效样本数约为
+\[
+\ess \approx 1.
+\]
+这说明：虽然系统转移允许算法在 \((1,1)\) 附近广泛采样，但当前观测非常尖锐，导致大部分粒子与观测不相容，于是权重几乎全部塌缩到一个粒子上。
+
+\paragraph{第五步：一个更靠近后验的提议分布}
+现在改用一个观测引导的提议分布：
+\[
+q_{\mathrm{guide}}(x_t \mid x_{t-1},y_t)
+=
+\Normal\!\left(
+\begin{bmatrix}
+2.7\\
+2.5
+\end{bmatrix},
+0.09\,I_2
+\right).
+\]
+这不是后验本身，但它刻意把采样中心放到了后验高概率区域附近。此时一组可能采样为
+\[
+(2.5,2.3),\quad (2.8,2.6),\quad (2.6,2.7),\quad (3.0,2.4).
+\]
+对应的重要性权重不再只由似然决定，而是
+\[
+\omega_t^{(i)}
+\propto
+\frac{p(y_t \mid x_t^{(i)})\,p(x_t^{(i)} \mid x_{t-1})}
+{q_{\mathrm{guide}}(x_t^{(i)} \mid x_{t-1},y_t)}.
+\]
+数值上，归一化权重大致为
+\[
+(0.140,\ 0.377,\ 0.284,\ 0.199),
+\]
+对应有效样本数约为
+\[
+\ess \approx 3.55.
+\]
+与前面的 \(\ess \approx 1\) 相比，这说明更合适的提议分布会让粒子更早落在后验高概率区域，从而显著减轻退化。
+
+\paragraph{第六步：三者到底怎么区分}
+这个二维例子里，三者的角色已经完全不同：
+\begin{enumerate}
+  \item 状态转移分布：系统本身怎么运动。在本例中，它把质量放在 \((1,1)\) 附近。
+  \item 提议分布：算法实际从哪里抽粒子。它可以等于状态转移分布，也可以更靠近观测。
+  \item 后验分布：结合观测后真正想逼近的目标。在本例中，它集中在 \((2.7308,2.5385)\) 附近。
+\end{enumerate}
+
+\paragraph{对应的 Python 脚本}
+仓库里附了
+\href{run:examples/proposal_2d_demo.py}{\nolinkurl{examples/proposal_2d_demo.py}}，
+运行方式是：
+\begin{quote}
+\nolinkurl{python3 notes/粒子滤波_基础/examples/proposal_2d_demo.py}
+\end{quote}
+该脚本会直接输出：
+\begin{enumerate}
+  \item 解析后验的均值与协方差；
+  \item Bootstrap 提议下的归一化权重与有效样本数；
+  \item 观测引导提议下的归一化权重与有效样本数。
+\end{enumerate}
+这样就可以直观看到：提议分布不是后验本身，但它的选择会极大影响粒子滤波的数值效率。
+
+\subsection{为什么粒子滤波能够跟踪时间演化的后验分布}\label{app:bayes-recursion}
+
+正文里说过一句话：粒子滤波之所以能够跟踪“分布随时间的演化”，不是因为粒子本身神奇，而是因为它在数值上逼近了 Bayes 滤波递推。下面把这句话写成一个严格的命题。
+
+\paragraph{第一步：把滤波递推写成两个算子}
+设状态空间为 \(\mathcal X\)，状态转移核为
+\[
+K_t(\xi, A) := \mathbb P(x_t \in A \mid x_{t-1}=\xi),
+\]
+观测似然记为
+\[
+g_t(x) := p(y_t \mid x).
+\]
+
+给定任意概率测度 \(\mu\)，定义预测算子
+\[
+\Phi_t(\mu)(A)
+:=
+\int_{\mathcal X} K_t(\xi,A)\,\mu(d\xi),
+\]
+以及更新算子
+\[
+\Psi_t(\mu)(dx)
+:=
+\frac{g_t(x)\,\mu(dx)}
+{\int_{\mathcal X} g_t(z)\,\mu(dz)}.
+\]
+
+于是 Bayes 滤波递推可以压缩写成
+\[
+\bar\pi_t = \Phi_t(\pi_{t-1}),
+\qquad
+\pi_t = \Psi_t(\bar\pi_t),
+\]
+其中 \(\bar\pi_t\) 是预测分布，\(\pi_t\) 是后验分布。
+
+\paragraph{第二步：先说明要证明什么}
+粒子滤波在时刻 \(t-1\) 给出一个近似测度 \(\pi_{t-1}^N\)。我们真正想证明的是：
+\begin{quote}
+如果 \(\pi_{t-1}^N\) 已经逼近 \(\pi_{t-1}\)，那么经过预测算子和更新算子之后，新的近似 \(\pi_t^N\) 仍然逼近 \(\pi_t\)。
+\end{quote}
+这正是“它能够跟踪时间演化分布”的数学内容。
+
+\paragraph{第三步：一般情形下的命题}
+设 \(\varphi\) 是任意有界连续测试函数，并假设：
+\begin{enumerate}
+  \item \(\pi_{t-1}^N \Rightarrow \pi_{t-1}\) 弱收敛；
+  \item 转移核 \(K_t\) 具有 Feller 性质，即对任意有界连续 \(\varphi\)，函数
+  \[
+  (K_t\varphi)(\xi)
+  :=
+  \int_{\mathcal X}\varphi(x)\,K_t(\xi,dx)
+  \]
+  仍是有界连续函数；
+  \item 似然 \(g_t\) 有界、连续，且
+  \[
+  \int_{\mathcal X} g_t(x)\,\Phi_t(\pi_{t-1})(dx) > 0.
+  \]
+\end{enumerate}
+定义
+\[
+\bar\pi_t^N := \Phi_t(\pi_{t-1}^N),
+\qquad
+\pi_t^N := \Psi_t(\bar\pi_t^N).
+\]
+则有
+\[
+\bar\pi_t^N \Rightarrow \bar\pi_t,
+\qquad
+\pi_t^N \Rightarrow \pi_t.
+\]
+
+\paragraph{第四步：预测步的严格证明}
+对任意有界连续 \(\varphi\)，有
+\[
+\int_{\mathcal X}\varphi(x)\,\bar\pi_t^N(dx)
+=
+\int_{\mathcal X}\varphi(x)\,\Phi_t(\pi_{t-1}^N)(dx).
+\]
+按 \(\Phi_t\) 的定义改写：
+\[
+\int_{\mathcal X}\varphi(x)\,\bar\pi_t^N(dx)
+=
+\int_{\mathcal X}
+\left(
+\int_{\mathcal X}\varphi(x)\,K_t(\xi,dx)
+\right)
+\pi_{t-1}^N(d\xi).
+\]
+记
+\[
+(K_t\varphi)(\xi)
+:=
+\int_{\mathcal X}\varphi(x)\,K_t(\xi,dx),
+\]
+则上式化为
+\[
+\int_{\mathcal X}\varphi(x)\,\bar\pi_t^N(dx)
+=
+\int_{\mathcal X}(K_t\varphi)(\xi)\,\pi_{t-1}^N(d\xi).
+\]
+由于 \(K_t\) 具有 Feller 性质，\(K_t\varphi\) 仍是有界连续函数；再由
+\(\pi_{t-1}^N \Rightarrow \pi_{t-1}\)，得到
+\[
+\int_{\mathcal X}(K_t\varphi)(\xi)\,\pi_{t-1}^N(d\xi)
+\to
+\int_{\mathcal X}(K_t\varphi)(\xi)\,\pi_{t-1}(d\xi).
+\]
+把定义代回，即
+\[
+\int_{\mathcal X}\varphi(x)\,\bar\pi_t^N(dx)
+\to
+\int_{\mathcal X}\varphi(x)\,\bar\pi_t(dx).
+\]
+因此
+\[
+\bar\pi_t^N \Rightarrow \bar\pi_t.
+\]
+
+\paragraph{第五步：更新步的严格证明}
+更新后，对任意有界连续 \(\varphi\)，有
+\[
+\int_{\mathcal X}\varphi(x)\,\pi_t^N(dx)
+=
+\frac{\int_{\mathcal X}\varphi(x)\,g_t(x)\,\bar\pi_t^N(dx)}
+{\int_{\mathcal X}g_t(x)\,\bar\pi_t^N(dx)}.
+\]
+因为 \(\varphi\) 与 \(g_t\) 都有界连续，所以 \(\varphi g_t\) 与 \(g_t\) 仍是有界连续函数。由刚证明的
+\(\bar\pi_t^N \Rightarrow \bar\pi_t\)，便有
+\[
+\int_{\mathcal X}\varphi(x)\,g_t(x)\,\bar\pi_t^N(dx)
+\to
+\int_{\mathcal X}\varphi(x)\,g_t(x)\,\bar\pi_t(dx),
+\]
+\[
+\int_{\mathcal X}g_t(x)\,\bar\pi_t^N(dx)
+\to
+\int_{\mathcal X}g_t(x)\,\bar\pi_t(dx).
+\]
+又由于极限分母严格为正，因此商收敛，于是
+\[
+\int_{\mathcal X}\varphi(x)\,\pi_t^N(dx)
+\to
+\int_{\mathcal X}\varphi(x)\,\pi_t(dx).
+\]
+这就证明了
+\[
+\pi_t^N \Rightarrow \pi_t.
+\]
+
+\paragraph{第六步：这一定理真正说明了什么}
+它说明：粒子滤波之所以能跟踪时间演化的后验分布，并不是因为“粒子会自动长成正确形状”，而是因为 Bayes 递推本身可分解为预测算子与更新算子，而这两个算子在适当条件下都会保留近似的一致性。
+
+换句话说：
+\begin{quote}
+上一时刻若近似正确，下一时刻经过 Bayes 预测与更新后，近似仍然可以继续传递下去。
+\end{quote}
+
+\paragraph{第七步：这和实际粒子滤波之间还差哪一步}
+上面的命题把重点放在“Bayes 算子如何传递近似”上。真正的粒子滤波还包含采样和重采样的随机机制，因此完整证明通常还要再加上：
+\begin{enumerate}
+  \item 采样经验测度对目标测度的一致性；
+  \item 重采样步骤的条件无偏性与方差控制；
+  \item 逐时刻归纳，得到整个粒子系统的一致性。
+\end{enumerate}
+但从结构上讲，决定它为何能跟踪时间演化分布的核心，正是上面这条“Bayes 算子保一致性”的命题。
+
+\paragraph{第八步：一维状态的简化证明}
+现在把状态空间专门取成 \(\mathcal X=\R\)，并设上一时刻的粒子近似为
+\[
+\pi_{t-1}^N(d\xi)=\sum_{i=1}^N w_{t-1}^{(i)}\delta_{x_{t-1}^{(i)}}(d\xi).
+\]
+设转移密度写成
+\[
+k_t(x\mid \xi),
+\]
+于是预测近似测度为
+\[
+\bar\pi_t^N(dx)
+=
+\sum_{i=1}^N w_{t-1}^{(i)}k_t(x\mid x_{t-1}^{(i)})\,dx.
+\]
+
+取任意有界连续测试函数 \(\varphi:\R\to\R\)。则
+\[
+\int_{\R}\varphi(x)\,\bar\pi_t^N(dx)
+=
+\sum_{i=1}^N w_{t-1}^{(i)}
+\int_{\R}\varphi(x)\,k_t(x\mid x_{t-1}^{(i)})\,dx.
+\]
+定义
+\[
+T_t\varphi(\xi)
+:=
+\int_{\R}\varphi(x)\,k_t(x\mid \xi)\,dx,
+\]
+则上式可写成
+\[
+\int_{\R}\varphi(x)\,\bar\pi_t^N(dx)
+=
+\sum_{i=1}^N w_{t-1}^{(i)}\,T_t\varphi(x_{t-1}^{(i)})
+=
+\int_{\R}T_t\varphi(\xi)\,\pi_{t-1}^N(d\xi).
+\]
+若 \(\pi_{t-1}^N \Rightarrow \pi_{t-1}\)，且 \(T_t\varphi\) 有界连续，则
+\[
+\int_{\R}T_t\varphi(\xi)\,\pi_{t-1}^N(d\xi)
+\to
+\int_{\R}T_t\varphi(\xi)\,\pi_{t-1}(d\xi)
+=
+\int_{\R}\varphi(x)\,\bar\pi_t(dx).
+\]
+因此预测步保持一致性。
+
+再设似然函数为
+\[
+g_t(x)=p(y_t\mid x).
+\]
+更新后的粒子测度定义为
+\[
+\pi_t^N(dx)
+=
+\frac{g_t(x)\,\bar\pi_t^N(dx)}
+{\int_{\R}g_t(z)\,\bar\pi_t^N(dz)}.
+\]
+于是
+\[
+\int_{\R}\varphi(x)\,\pi_t^N(dx)
+=
+\frac{\int_{\R}\varphi(x)g_t(x)\,\bar\pi_t^N(dx)}
+{\int_{\R}g_t(x)\,\bar\pi_t^N(dx)}.
+\]
+若 \(\bar\pi_t^N \Rightarrow \bar\pi_t\)，且 \(\varphi g_t\)、\(g_t\) 都有界连续，分母极限严格正，则分子分母分别收敛，从而
+\[
+\int_{\R}\varphi(x)\,\pi_t^N(dx)
+\to
+\int_{\R}\varphi(x)\,\pi_t(dx).
+\]
+因此一维情形下，粒子近似之所以能够随时间跟踪后验分布，本质上仍然是：预测算子与更新算子把上一时刻的近似继续传到了下一时刻。
+
+\subsection{后验期望为何写成积分，以及粒子估计量为何逼近真实后验期望}\label{app:expectation-approx}
+
+正文里出现过下面这一步：
+\[
+\widehat{I}_t^N(\varphi)
+:=
+\int_{\mathcal X} \varphi(x)\,\pi_t^N(dx)
+=
+\sum_{i=1}^N w_t^{(i)} \varphi(x_t^{(i)}).
+\]
+而它所对应的真实目标量是
+\[
+I_t(\varphi)
+:=
+\E[\varphi(x_t)\mid y_{1:t}]
+=
+\int_{\mathcal X}\varphi(x)\,\pi_t(dx).
+\]
+对初学者而言，最容易困惑的是：这些等号各自依据什么，以及为什么 \(\widehat{I}_t^N(\varphi)\) 可以拿来估计 \(I_t(\varphi)\)。下面分开说明。
+
+\paragraph{第一步：为什么
+\(\E[\varphi(x_t) \mid y_{1:t}]
+= \int_{\mathcal X} \varphi(x)\,\pi_t(dx)\)
+是等号}
+这一步没有做任何近似，它只是把“条件期望”换写成“对后验分布积分”。
+
+因为我们已经把时刻 \(t\) 的后验分布记成
+\[
+\pi_t(dx)=p(x_t\mid y_{1:t})\,dx.
+\]
+所以按照期望对分布积分的定义，
+\[
+\E[\varphi(x_t)\mid y_{1:t}]
+= \int_{\mathcal X} \varphi(x)\,p(x_t\mid y_{1:t})\,dx
+= \int_{\mathcal X} \varphi(x)\,\pi_t(dx).
+\]
+因此这里的等号只是记号改写：左边是“条件期望”的写法，右边是“相对于后验分布积分”的写法，二者表示的是同一个量。
+
+\paragraph{第二步：粒子滤波并不直接得到 \(\pi_t\)，而是先构造经验测度}
+粒子滤波输出的是粒子与权重，因此首先得到的是经验测度
+\[
+\pi_t^N(dx)=\sum_{i=1}^N w_t^{(i)}\delta_{x_t^{(i)}}(dx).
+\]
+于是把 \(\varphi\) 对 \(\pi_t^N\) 积分，就定义出粒子估计量
+\[
+\widehat{I}_t^N(\varphi)
+:=
+\int_{\mathcal X}\varphi(x)\,\pi_t^N(dx)
+=
+\int_{\mathcal X}\varphi(x)\,
+\left(\sum_{i=1}^N w_t^{(i)}\delta_{x_t^{(i)}}(dx)\right).
+\]
+
+\paragraph{第三步：为什么
+\(\widehat{I}_t^N(\varphi)
+= \sum_{i=1}^N w_t^{(i)}\varphi(x_t^{(i)})\)
+仍然是等号}
+这一步同样不是近似，而是 Dirac 质量的定义性性质。
+
+先把常数权重提出，再逐项积分：
+\[
+\widehat{I}_t^N(\varphi)
+= \sum_{i=1}^N w_t^{(i)}
+\int_{\mathcal X}\varphi(x)\,\delta_{x_t^{(i)}}(dx).
+\]
+
+而 Dirac 质量满足
+\[
+\int_{\mathcal X}\varphi(x)\,\delta_{x_t^{(i)}}(dx)
+= \varphi(x_t^{(i)}).
+\]
+代回即得
+\[
+\widehat{I}_t^N(\varphi)
+= \sum_{i=1}^N w_t^{(i)}\varphi(x_t^{(i)}).
+\]
+所以这一小步仍然是严格等式。
+
+\paragraph{第四步：逼近关系究竟发生在哪里}
+真正需要说明的，不是“积分如何变成求和”，而是经验测度为何可以逼近真实后验。更准确地说，我们需要的是
+\[
+\widehat{I}_t^N(\varphi) - I_t(\varphi) \to 0
+\qquad (N\to\infty)
+\]
+这样的收敛结论。若用概率收敛来表述，可以写成
+\[
+\widehat{I}_t^N(\varphi) - I_t(\varphi)
+\xrightarrow[]{\mathbb P} 0,
+\qquad N\to\infty,
+\]
+其中需要对模型、权重和测试函数 \(\varphi\) 施加适当假设。这才是严格的数学表述。
+
+如果进一步研究中心极限定理，常可得到更细的误差尺度，例如
+\[
+\widehat{I}_t^N(\varphi) - I_t(\varphi)
+= O_{\mathbb P}(N^{-1/2}),
+\]
+但这已经依赖更强的技术条件，不能在正文里不加说明地直接写成一个普通的“约等于”。
+
+\paragraph{第五步：把逻辑压缩成一句话}
+因此，正确的理解顺序不是
+\begin{quote}
+积分大概等于求和，
+\end{quote}
+而是
+\begin{quote}
+先定义真实目标量 \(I_t(\varphi)\)，再定义粒子估计量 \(\widehat{I}_t^N(\varphi)\)；随后在一致性或渐近理论下证明 \(\widehat{I}_t^N(\varphi)\) 逼近 \(I_t(\varphi)\)。
+\end{quote}
+
+\paragraph{一个最小数值例子}
+设
+\[
+\pi_t^3(dx)=0.2\,\delta_0(dx)+0.5\,\delta_2(dx)+0.3\,\delta_3(dx),
+\qquad
+\varphi(x)=x^2.
+\]
+那么
+\[
+= \widehat{I}_t^3(\varphi)
+= \int_{\mathcal X} x^2\,\pi_t^3(dx)
+= 0.2\cdot 0^2 + 0.5\cdot 2^2 + 0.3\cdot 3^2
+= 4.7.
+\]
+这里最后一步不是近似，而是严格计算。若进一步用它估计
+\[
+I_t(x^2)
+= \E[x_t^2\mid y_{1:t}]
+= \int_{\mathcal X} x^2\,\pi_t(dx),
+\]
+则严格写法应是考察误差
+\[
+\widehat{I}_t^3(x^2)-I_t(x^2),
+\]
+并在 \(N\) 增大时讨论它是否趋于 \(0\)，而不是直接写一个没有说明误差含义的近似号。
+
+\subsection{重采样为何保持条件期望不变}\label{app:resampling-unbiased}
+
+正文里写过下面这条公式：
+\[
+\E\!\left[\frac{1}{N}\sum_{i=1}^N \varphi(\tilde{x}_t^{(i)})
+\Bigm| \{x_t^{(j)},w_t^{(j)}\}_{j=1}^N \right]
+= \sum_{j=1}^N w_t^{(j)} \varphi(x_t^{(j)}).
+\]
+这句话看起来很强，因此必须先问：为什么这里要研究它？
+
+\paragraph{第一步：为什么要引入这条公式}
+因为重采样会把带权粒子
+\[
+\{x_t^{(j)},w_t^{(j)}\}_{j=1}^N
+\]
+改成等权粒子
+\[
+\{\tilde x_t^{(i)},1/N\}_{i=1}^N.
+\]
+这一过程显然会改变样本的具体排列，甚至会删除一些粒子、复制另一些粒子。因此自然要追问：
+\begin{quote}
+重采样之后，我们用等权粒子算出来的平均量，会不会系统性偏离重采样之前的带权平均？
+\end{quote}
+上面的条件期望公式正是在回答这个问题。它说明：至少对经验平均而言，multinomial resampling 在条件期望意义下是无偏的。
+
+\paragraph{第二步：先把重采样写成随机索引}
+以 multinomial resampling 为例。给定当前粒子与权重后，重采样等价于独立抽取索引
+\[
+A_1,\dots,A_N \in \{1,\dots,N\},
+\]
+并满足
+\[
+\mathbb P(A_i=j \mid \{x_t^{(k)},w_t^{(k)}\}_{k=1}^N)=w_t^{(j)}.
+\]
+然后定义
+\[
+\tilde x_t^{(i)} := x_t^{(A_i)}.
+\]
+也就是说，每个新粒子都是“按权重随机选一个旧粒子作为祖先”得到的。
+
+\paragraph{第三步：先求单个重采样粒子的条件期望}
+固定某个 \(i\)。在给定当前粒子与权重的条件下，
+\[
+\E[\varphi(\tilde x_t^{(i)}) \mid \{x_t^{(k)},w_t^{(k)}\}_{k=1}^N]
+= \sum_{j=1}^N \mathbb P(A_i=j \mid \{x_t^{(k)},w_t^{(k)}\}_{k=1}^N)\,\varphi(x_t^{(j)}).
+\]
+把条件概率替换成权重，即得
+\[
+\E[\varphi(\tilde x_t^{(i)}) \mid \{x_t^{(k)},w_t^{(k)}\}_{k=1}^N]
+= \sum_{j=1}^N w_t^{(j)} \varphi(x_t^{(j)}).
+\]
+这说明：单个重采样粒子的函数值，其条件期望就已经等于原先的带权平均。
+
+\paragraph{第四步：再推广到 \(N\) 个等权粒子的平均}
+现在看重采样后的等权经验平均：
+\[
+\frac1N\sum_{i=1}^N \varphi(\tilde x_t^{(i)}).
+\]
+对它取条件期望，并利用期望的线性性，有
+\[
+\E\!\left[\frac1N\sum_{i=1}^N \varphi(\tilde x_t^{(i)})
+\Bigm| \{x_t^{(k)},w_t^{(k)}\}_{k=1}^N\right]
+=
+\frac1N\sum_{i=1}^N
+\E[\varphi(\tilde x_t^{(i)}) \mid \{x_t^{(k)},w_t^{(k)}\}_{k=1}^N].
+\]
+代入上一步结果：
+\[
+\E\!\left[\frac1N\sum_{i=1}^N \varphi(\tilde x_t^{(i)})
+\Bigm| \{x_t^{(k)},w_t^{(k)}\}_{k=1}^N\right]
+=
+\frac1N\sum_{i=1}^N
+\sum_{j=1}^N w_t^{(j)} \varphi(x_t^{(j)}).
+\]
+由于右边与 \(i\) 无关，故
+\[
+\E\!\left[\frac1N\sum_{i=1}^N \varphi(\tilde x_t^{(i)})
+\Bigm| \{x_t^{(k)},w_t^{(k)}\}_{k=1}^N\right]
+=
+\sum_{j=1}^N w_t^{(j)} \varphi(x_t^{(j)}).
+\]
+这就得到正文中的条件期望公式。
+
+\paragraph{第五步：这条公式到底说明了什么，又没有说明什么}
+它说明的是：
+\begin{quote}
+重采样后的等权经验平均，在条件期望意义下，与重采样前的带权经验平均一致。
+\end{quote}
+但它没有说明：
+\begin{enumerate}
+  \item 单次重采样的结果一定等于原带权平均；
+  \item 重采样不会增加方差；
+  \item 重采样不会降低样本多样性。
+\end{enumerate}
+恰恰相反，重采样通常会引入额外随机性，并可能导致粒子复制，从而降低多样性。它保住的是“条件期望无偏”，而不是“每次实现都无损”。
+
+\paragraph{一个最小离散例子}
+设当前只有两个粒子
+\[
+x_t^{(1)}=0,\qquad x_t^{(2)}=10,
+\]
+权重为
+\[
+w_t^{(1)}=0.8,\qquad w_t^{(2)}=0.2.
+\]
+取测试函数 \(\varphi(x)=x\)。则重采样前的带权平均为
+\[
+0.8\cdot 0 + 0.2\cdot 10 = 2.
+\]
+
+若 \(N=2\) 并做 multinomial resampling，则每个新粒子都以概率 \(0.8\) 取 \(0\)，以概率 \(0.2\) 取 \(10\)。于是单个新粒子的条件期望为
+\[
+\E[\tilde x_t^{(i)} \mid \{x_t^{(j)},w_t^{(j)}\}_{j=1}^2]
+= 0.8\cdot 0 + 0.2\cdot 10 = 2.
+\]
+因此
+\[
+\E\!\left[\frac{\tilde x_t^{(1)}+\tilde x_t^{(2)}}{2}
+\Bigm| \{x_t^{(j)},w_t^{(j)}\}_{j=1}^2\right]
+= 2.
+\]
+但一次具体实现可能是
+\[
+(0,0),\qquad (0,10),\qquad (10,0),\qquad (10,10),
+\]
+它们对应的等权平均分别是
+\[
+0,\qquad 5,\qquad 5,\qquad 10.
+\]
+可见单次结果波动很大；真正保持不变的是条件期望，而不是每次实现本身。
 
 \section{基础概率公式附录}
 

@@ -1,0 +1,38 @@
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{amsmath, amssymb, bm, mathtools}
+\usepackage{booktabs, array, longtable}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{microtype}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!65!black,
+  urlcolor=blue!65!black,
+  citecolor=blue!65!black
+}
+
+\setlist[itemize]{topsep=4pt, itemsep=3pt}
+\setlist[enumerate]{topsep=4pt, itemsep=3pt}
+
+\newcommand{\speaker}[2]{%
+  \par\smallskip
+  \noindent\textbf{#1：} #2\par
+}
+
+\newcommand{\teacher}[1]{\speaker{老师}{#1}}
+\newcommand{\studenta}[1]{\speaker{学生A}{#1}}
+\newcommand{\studentb}[1]{\speaker{学生B}{#1}}
+\newcommand{\studentc}[1]{\speaker{学生C}{#1}}
+\newcommand{\studentd}[1]{\speaker{学生D}{#1}}
+\newcommand{\studente}[1]{\speaker{学生E}{#1}}
+
+\newcommand{\proofstep}[2]{%
+  \medskip
+  \noindent\textcolor{blue!70!black}{\textsf{#1}}\quad #2\par
+}
+
+\newcommand{\eqfocusa}[1]{\textcolor{blue!70!black}{#1}}
+\newcommand{\eqfocusb}[1]{\textcolor{teal!60!black}{#1}}
+\newcommand{\eqfocusc}[1]{\textcolor{orange!80!black}{#1}}

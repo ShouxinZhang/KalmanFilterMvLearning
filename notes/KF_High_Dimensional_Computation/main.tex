@@ -1,0 +1,740 @@
+\documentclass[12pt,a4paper]{article}
+\input{preamble.tex}
+
+\title{Notes on the High-Dimensional Computational Bottleneck of the Kalman Filter\\
+\large Why the textbook equations stay elegant while the implementation becomes expensive}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\section{Why This Matters}
+
+The Kalman filter looks deceptively cheap when first introduced. In the classroom, the state is often two-dimensional: position and velocity. The matrices fit on one line. The update can be carried out by hand. That is the pleasant version.
+
+The engineering version is different. In weather prediction, large sensor networks, imaging, or parameter tracking for modern models, the state may contain thousands or millions of unknowns. At that point, the filter is no longer blocked by the idea of prediction and correction. It is blocked by the cost of carrying a dense covariance matrix through time.
+
+If you want the compact terminology first, jump to \hyperref[app:glossary]{Appendix~\ref*{app:glossary}}. If you want the detailed cost derivation, go directly to \hyperref[app:derivation-cost]{Appendix~\ref*{app:derivation-cost}}. If you prefer a concrete hand-computable example, see \hyperref[app:classic-1d]{Appendix~\ref*{app:classic-1d}}.
+
+\teacher{A Kalman filter does not become conceptually wrong in high dimension. It becomes computationally expensive.}
+\studenta{So the problem is not the formula. The problem is that the formula carries a very large matrix?}
+\teacher{Exactly. The state estimate is a vector, but the uncertainty is a matrix of pairwise couplings. That matrix is where the bill arrives.}
+
+\section{The High-Level Logic}
+
+\subsection{The Black-Box View}
+
+The standard linear-Gaussian Kalman filter takes four ingredients:
+\begin{itemize}
+  \item a previous state estimate,
+  \item a state transition model,
+  \item a new observation,
+  \item and uncertainty descriptions for model noise and measurement noise.
+\end{itemize}
+
+It then performs two moves:
+\begin{enumerate}
+  \item \textbf{Predict.} Push the old estimate and its uncertainty one step forward.
+  \item \textbf{Correct.} Compare the predicted observation with the actual observation, then shift the estimate toward the data by an amount determined by the Kalman gain.
+\end{enumerate}
+
+The output is not merely an updated mean. It is a pair:
+\[
+(\hat{x}_{t|t}, P_{t|t}),
+\]
+where the vector \(\hat{x}_{t|t}\) is the best current estimate and the matrix \(P_{t|t}\) records how uncertain the filter still is.
+
+\subsection{The Central Intuition}
+
+The mean vector is easy to store. The covariance matrix is the difficult part. If the state has dimension \(n\), then \(P_{t|t}\) has \(n^2\) entries. A dense covariance therefore says:
+\begin{quote}
+I am not only tracking the uncertainty of each coordinate. I am also tracking how every coordinate moves with every other coordinate.
+\end{quote}
+
+That is statistically valuable. It is also what makes the dense filter expensive.
+
+\section{A Running Pair of Examples}
+
+\subsection{Small Example: A Car on a Straight Line}
+
+The classical textbook example uses
+\[
+x_t =
+\begin{bmatrix}
+p_t\\
+v_t
+\end{bmatrix},
+\qquad
+F =
+\begin{bmatrix}
+1 & 1\\
+0 & 1
+\end{bmatrix},
+\qquad
+H =
+\begin{bmatrix}
+1 & 0
+\end{bmatrix}.
+\]
+
+This is a good teaching example because it isolates the idea. One sensor reads position. The filter reconstructs both position and velocity. The full numerical walk-through is collected in \hyperref[app:classic-1d]{Appendix~\ref*{app:classic-1d}}.
+
+\subsection{Large Example: A Temperature Field on a Grid}
+
+Now replace the two-dimensional state by a \(100 \times 100\) temperature grid. The state dimension is
+\[
+n = 10{,}000.
+\]
+
+The filter still wants a covariance matrix \(P \in \mathbb{R}^{10000 \times 10000}\). That single dense matrix contains
+\[
+10{,}000^2 = 100{,}000{,}000
+\]
+entries. In double precision, that is roughly \(0.8\) GB for one covariance matrix alone. Real code typically carries multiple matrices and temporary factors, so the true memory footprint is much larger.
+
+\studentb{A single matrix already takes almost a gigabyte. Then the usual matrix multiplications and factorizations are the real bottleneck.}
+\teacher{Yes. The filter is still mathematically the same. But the machine must now pay for dense linear algebra at scale.}
+
+\section{Where the Computational Disaster Comes From}
+
+\subsection{Storage Cost}
+
+For a dense state covariance,
+\[
+P_{t|t} \in \mathbb{R}^{n \times n},
+\]
+the raw storage cost is \(O(n^2)\).
+
+This matters because storage is not a passive issue. Once a matrix is dense, every later step must move and combine that dense object. Memory pressure and arithmetic cost rise together.
+
+\subsection{Prediction Cost}
+
+The covariance prediction step is
+\[
+P_{t+1|t} = F P_{t|t} F^\top + Q.
+\]
+
+If \(F\) and \(P_{t|t}\) are both dense \(n \times n\) matrices, then the dominant work is dense matrix multiplication. The cost is \(O(n^3)\). The detailed step-by-step derivation appears in \hyperref[app:derivation-cost]{Appendix~\ref*{app:derivation-cost}}.
+
+\subsection{Update Cost}
+
+The innovation covariance is
+\[
+S_t = H P_{t|t-1} H^\top + R.
+\]
+
+If the observation dimension is \(m\), then forming and solving with \(S_t\) costs about
+\[
+O(m n^2 + m^3)
+\]
+in the dense case. If \(m\) is comparable to \(n\), this again behaves like \(O(n^3)\).
+
+The key lesson is simple:
+\begin{quote}
+The textbook filter scales comfortably only when structure is small, sparse, diagonal, block-separable, or otherwise exploitable.
+\end{quote}
+
+\section{A Quick Numerical Scale Check}
+
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+State dimension \(n\) & Entries in dense \(P\) & Memory for one dense \(P\) & Dense cubic scale \\
+\midrule
+\(10^2\) & \(10^4\) & about \(0.08\) MB & \(10^6\) \\
+\(10^3\) & \(10^6\) & about \(8\) MB & \(10^9\) \\
+\(10^4\) & \(10^8\) & about \(800\) MB & \(10^{12}\) \\
+\(10^5\) & \(10^{10}\) & about \(80\) GB & \(10^{15}\) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The last column is not a precise runtime. It is a scale indicator. It shows why the phrase \emph{high-dimensional computational disaster} is not rhetorical. Once \(n\) grows, cubic work becomes the main story.
+
+\section{Why the Remedy Depends on the Benchmark}
+
+Not every expensive filtering problem is expensive for the same reason. This is precisely why a useful solution almost always depends on the computational example in front of you. A good first pass is to ask four questions:
+\begin{enumerate}
+  \item Are the dynamics and observations essentially linear, or genuinely nonlinear?
+  \item Is the state low-dimensional, moderately sized, or already very large?
+  \item Are the couplings global and dense, or mostly local and sparse?
+  \item Are observations dense, or only partial and local?
+\end{enumerate}
+
+Those four questions already separate several very different worlds.
+
+\paragraph{World 1: linear and moderate in size.}
+If the model is linear and the state is not too large, then the classical Kalman filter is still the right object. The real issue is usually numerical stability rather than conceptual mismatch. In that regime, square-root forms, Joseph updates, or information forms are refinements of a method that fundamentally still fits the problem.
+
+\paragraph{World 2: nonlinear but still low-dimensional.}
+Here the classic benchmark is the Lorenz-63 system: only three state variables, but strongly nonlinear and sensitive to initial conditions. In that world, the primary obstacle is not covariance storage. The real question is whether local linearization is trustworthy. That is why one compares EKF, UKF, and particle methods. The dominant pain comes from nonlinearity and non-Gaussianity, not from carrying a \(10000 \times 10000\) covariance matrix.
+
+\paragraph{World 3: nonlinear, chaotic, and already fairly high-dimensional.}
+This is where the Lorenz-96 family becomes more representative. The state may have 40, 80, or many more variables, coupled locally on a ring. Now the problem changes character. One still faces nonlinearity, but brute-force covariance propagation also becomes too expensive and often too fragile. That is why ensemble Kalman filtering with localization and inflation becomes so natural: it keeps the flow-dependent uncertainty, but avoids insisting on one exact dense covariance matrix.
+
+\paragraph{World 4: high-dimensional with exploitable linear structure.}
+Some large systems are not mainly nonlinear; they are mainly structured. PDE discretizations, network models, or local sensor fusion problems often have sparse transitions, banded couplings, or block structure. Then the right move is not necessarily an ensemble method. Sometimes the real win comes from sparse linear algebra, reduced-order models, or blockwise covariance approximations.
+
+The broader lesson is simple:
+\begin{quote}
+One does not solve ``the'' high-dimensional Kalman problem in the abstract. One solves a particular geometric and computational instance of it.
+\end{quote}
+
+If you want a more concrete benchmark comparison, see \hyperref[app:classic-lorenz]{Appendix~\ref*{app:classic-lorenz}}.
+
+\section{What the Lorenz-96 Papers Actually Suggest}
+
+Once one reads the Lorenz-96 data-assimilation literature, a fairly stable picture emerges. The community does \emph{not} try to rescue the full dense Kalman filter in its original form. Instead, the mainstream strategy is to change the representation of uncertainty.
+
+\paragraph{The canonical recipe.}
+For Lorenz-96-style problems, the default answer in the literature is usually:
+\begin{enumerate}
+  \item propagate an \emph{ensemble} instead of a full covariance matrix,
+  \item perform \emph{local} analyses rather than one global dense update,
+  \item apply \emph{inflation} to counter ensemble underdispersion,
+  \item and tune or adapt localization/inflation as part of the method rather than as an afterthought.
+\end{enumerate}
+
+This logic is already visible in \href{https://arxiv.org/abs/physics/0203058}{Ott et al. (2002)} and \href{https://arxiv.org/abs/physics/0511236}{Hunt, Kostelich, and Szunyogh (2005)}. Their key move is not merely ``use fewer samples.'' It is more structural: replace one gigantic covariance object by many low-dimensional local problems that can be solved in parallel.
+
+\paragraph{Why this fits Lorenz-96 specifically.}
+Lorenz-96 is nonlinear and chaotic, but it also has an important geometric feature: the coupling is local. Each component mainly interacts with nearby components. That makes global dense covariances both expensive and somewhat wasteful. Localization is not just a computational trick here. It is an attempt to match the filter to the geometry of the model.
+
+\paragraph{Why inflation keeps appearing.}
+With a small ensemble, the sample covariance is rank-deficient and often too confident. In practice, the filter starts to underestimate uncertainty, which can lead to instability or outright divergence. This is why inflation shows up again and again in Lorenz-96 papers. \href{https://arxiv.org/abs/1210.1318}{Luo and Hoteit (2012)} add residual nudging to improve stability in the 40-dimensional Lorenz-96 setting, while \href{https://arxiv.org/abs/1806.10655}{Attia and Constantinescu (2018)} explicitly optimize localization radii and inflation factors in a Lorenz-96 benchmark.
+
+\paragraph{What newer papers change.}
+Recent work usually keeps the same benchmark logic, but tries to reduce the tuning burden or to cope with stronger nonlinearity. \href{https://arxiv.org/abs/2404.00154}{Choi and Lee (2024)} reinterpret sampling-error mitigation through spectrum smoothing, which effectively induces spatially varying localization and inflation in Lorenz models. \href{https://arxiv.org/abs/2309.00983}{Bao, Zhang, and Zhang (2023)} propose the Ensemble Score Filter for highly nonlinear high-dimensional settings. \href{https://arxiv.org/abs/2006.04699}{Robinson and Grooms (2020)} study a hybrid particle--ensemble Kalman filter for medium nonlinearity. \href{https://arxiv.org/abs/2408.04739}{Bocquet et al. (2024)} show that, for Lorenz-96, a learned analysis map can approach a well-tuned ensemble filter even while propagating only a single forecast state. \href{https://arxiv.org/abs/2603.03926}{Ait-El-Fquih and Hoteit (2026)} go after the localization problem itself, proposing a structurally localized EnKF so that locality is built into the analysis rather than added afterward by hand.
+
+\subsection{Method-by-Method: What Each Idea Is Actually Fixing}
+
+\paragraph{LETKF / localized EnKF: turn one huge problem into many small ones.}
+The failure mode here is clear: a global dense covariance is too expensive, and a small ensemble gives a poor global sample covariance anyway. The inputs are a forecast ensemble, local observations, and observation errors. Step one: for each grid point, extract a local state patch and the nearby observations. Step two: do the Kalman analysis not in the full state space, but in the low-dimensional ensemble-weight space. Step three: map the local analysis back to a global analysis ensemble. The key derivation is that the expensive linear algebra is moved from the \(n\)-dimensional state space to the \(N_e-1\)-dimensional ensemble subspace. That is why the dominant cost becomes controlled by ensemble size rather than state dimension. This is especially natural for Lorenz-96 because the coupling is local on a ring. The trade-off is that one must now choose localization windows, observation cutoffs, and inflation rules. \href{https://arxiv.org/abs/physics/0203058}{Ott et al. (2002)} and \href{https://arxiv.org/abs/physics/0511236}{Hunt, Kostelich, and Szunyogh (2005)} are the canonical references.
+
+\paragraph{Residual nudging: keep the analysis from becoming implausible in observation space.}
+This method addresses stability rather than raw complexity. Sometimes an EnKF analysis is still much too far from the actual observations, which is a warning sign that the filter has become overconfident. The inputs are the usual EAKF analysis mean, the observation \(y\), and a tolerance for the residual norm. Step one: compute the analysis residual \(r^a = y - Hx^a\). Step two: if \(\lVert r^a \rVert\) is too large, replace the analysis mean by a convex combination of the original analysis and an observation inversion \(x^o\). Step three: keep the covariance update unchanged and continue the filter. The essential relation is
+\[
+\tilde x^a = c x^a + (1-c)x^o,
+\]
+with \(c\) chosen so that the residual is pulled back below the threshold. Intuitively, the method says: even if the filter is imperfect, do not let it make an obviously unreasonable claim in observation space. This is useful in Lorenz-96 precisely because small-ensemble divergence is common. The trade-off is that it is mainly a stability device, not a magical accuracy booster. See \href{https://arxiv.org/abs/1210.1318}{Luo and Hoteit (2012)}.
+
+\paragraph{Adaptive inflation / localization: treat tuning parameters as optimization variables.}
+The failure mode is that fixed scalar inflation factors and localization radii are too crude for a flow-dependent chaotic system. The inputs are the forecast ensemble, current observations, and a design criterion. Step one: regard the inflation vector \(\lambda\) or the localization-radius vector \(L\) as decision variables. Step two: minimize the posterior covariance trace, with regularization to avoid pathological solutions. Step three: use the optimized \(\lambda\) or \(L\) for the current analysis step. The key idea is that the method does not directly minimize the current RMSE; instead it minimizes the total posterior uncertainty left after the analysis. That is a much cleaner target when the system is high-dimensional and flow-dependent. It fits Lorenz-96 because different regions can indeed need different levels of inflation and localization. The trade-off is that every assimilation cycle becomes more expensive and implementation becomes much more elaborate. \href{https://arxiv.org/abs/1806.10655}{Attia and Constantinescu (2018)} is the representative paper.
+
+\paragraph{Spectrum smoothing: repair the ensemble in Fourier space before the ETKF update.}
+This method targets sampling error. Standard localization acts directly in physical space; spectrum smoothing first modifies the ensemble in frequency space. The input is the prior ensemble. Step one: Fourier transform the ensemble perturbations and estimate the mean power spectrum. Step two: smooth that spectrum with a kernel. Step three: rescale the Fourier amplitudes so that the mean spectrum matches the smoothed one. Step four: return to a standard ETKF analysis. The key theoretical lever is the Wiener--Khinchin correspondence: the spectrum and the autocorrelation determine one another. So if the spectrum is repaired to look more like the smooth decaying spectrum of a turbulent system, the correlation estimate should also become more trustworthy. This helps on Lorenz-96 when the model is genuinely in a turbulent regime with a meaningful spectrum; it helps much less in low-dimensional or weakly turbulent settings. See \href{https://arxiv.org/abs/2404.00154}{Choi and Lee (2024)}.
+
+\paragraph{Ensemble Score Filter: update a score representation rather than a covariance representation.}
+This method is aimed at the regime of high dimension plus strongly nonlinear observations, where LETKF can become brittle and heavily hand-tuned. The inputs are the prior ensemble, the observations, and the observation model. Step one: represent the prior filtering density through a diffusion-model score rather than through a covariance matrix alone. Step two: inject the likelihood gradient gradually in pseudo-time. Step three: run a reverse-time sampler to transport the prior into the posterior. The essential relationship is
+\[
+\nabla \log p(x \mid y) \approx \nabla \log p(x) + h(\tau)\nabla \log p(y \mid x),
+\]
+which says that one combines the geometry of the prior with the pull from the observations over a pseudo-time path. The attraction for Lorenz-96 is that this directly addresses non-Gaussian posterior geometry. The cost is a heavier algorithmic stack: pseudo-time steps, noise schedules, reverse solvers, and additional hyperparameters. See \href{https://arxiv.org/abs/2309.00983}{Bao, Zhang, and Zhang (2023)}.
+
+\paragraph{Hybrid particle--EnKF: let a particle step remove the worst non-Gaussianity before an EnKF step finishes the job.}
+The target regime is medium nonlinearity: the prior is distinctly non-Gaussian, but the posterior is still close enough to Gaussian that an EnKF can finish well. The inputs are an ensemble, observations, and an effective-sample-size target. Step one: split the likelihood as
+\[
+p(y \mid x) = p(y \mid x)^{\alpha} p(y \mid x)^{1-\alpha}.
+\]
+Step two: use the first factor in a particle-filter update. Step three: choose \(\alpha\) through an ESS target so that the particle weights do not collapse. Step four: apply an ESRF to assimilate the remaining factor. Intuitively, the particle step first reshapes the ensemble into something more Gaussian-looking, and then the EnKF-style update becomes more appropriate. This is useful for Lorenz-96 only when the problem truly lies in that intermediate non-Gaussian regime. The trade-off is more tuning and the continued risk of particle degeneracy if the ensemble is too small. See \href{https://arxiv.org/abs/2006.04699}{Robinson and Grooms (2020)}.
+
+\paragraph{Learned analysis maps / DAN: learn where the unstable error directions live instead of carrying an explicit ensemble.}
+The sharp question here is whether one can recover much of what a well-tuned EnKF does without explicitly propagating an ensemble. The inputs are a single forecast state and the current observations. Step one: train an analysis operator \(a_\theta\) on twin experiments. Step two: at run time, feed the forecast state and the observations directly to \(a_\theta\). Step three: output the analysis state. The crucial intuition is not that neural networks are somehow more Bayesian; it is that in Lorenz-96 the dominant forecast errors are concentrated along a relatively small set of unstable directions, and these directions are strongly tied to the current state. A learned map can therefore approximate state-dependent error correction without explicitly carrying an ensemble. The trade-off is that the method is benchmark-driven and requires training, so its generalization boundary has to be checked rather than assumed. See \href{https://arxiv.org/abs/2408.04739}{Bocquet et al. (2024)}.
+
+\subsection{How the Theory, the Code, and the Results Line Up}
+
+\paragraph{The key theoretical moves are four different ways of making the problem easier.}
+\begin{enumerate}
+  \item LETKF moves the analysis from state space to ensemble-weight space.
+  \item residual nudging adds an explicit plausibility constraint in observation space.
+  \item hybrid PF--EnKF splits the likelihood so that prior-shape correction and near-Gaussian updating are separated.
+  \item score-based filtering replaces covariance geometry by score geometry.
+\end{enumerate}
+
+\paragraph{What these ideas look like in code.}
+\begin{itemize}
+  \item \textbf{LETKF / adaptive EnKF:} the practical loop is forecast $\rightarrow$ collect local windows $\rightarrow$ solve many small updates or small optimization problems $\rightarrow$ stitch the global analysis back together. In \href{https://bitbucket.org/a_attia/dates_adaptive}{DATeS}, \texttt{adaptive\_EnKF.py} literally implements bounded optimization for inflation and localization, then smooths the optimized vectors with a moving average before rerunning the analysis.
+  \item \textbf{EnSF:} the \href{https://github.com/zezhongzhang/EnSF}{official repository} separates \texttt{NoiseSchedule}, \texttt{ScoreRep}, and \texttt{ReverseSampler}; \texttt{fine\_tune\_EnSF/results/final\_rmse\_EnSF.csv} and \texttt{run\_all\_EnSF/param\_EnSF.csv} expose the practical knobs directly, including \texttt{Nt\_SDE}, \(\epsilon_a\), \(\epsilon_b\), and ensemble size, so the paper's best settings can be checked against the code rather than taken on faith.
+  \item \textbf{spectrum smoothing:} the implementation is conceptually simple. ETKF remains the outer method, but each assimilation cycle now has a Fourier-domain rescaling pre-processing step.
+  \item \textbf{hybrid PF--EnKF:} the public code/data release in \href{https://doi.org/10.5281/zenodo.4394312}{the Zenodo package linked by Robinson and Grooms} makes the three main knobs explicit: inflation, localization radius, and ESS threshold.
+\end{itemize}
+
+\paragraph{A reading rule before the tables.}
+The numbers below are real reported numbers from the original papers, but \emph{absolute RMSE values should not be compared blindly across papers}. The state dimension, observation operator, noise level, assimilation interval, and even the precise Lorenz-96 variant differ. So the safe comparison is always first within a table and within one paper's setup, and only then across papers at the level of failure modes and trade-offs.
+
+\paragraph{Table 1: residual nudging is most convincing as a stability ablation.}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.1cm} >{\raggedright\arraybackslash}p{4.1cm} >{\raggedright\arraybackslash}p{4.1cm} >{\raggedright\arraybackslash}p{4.3cm}}
+\toprule
+Scenario & Best time-mean RMSE, EAKF & Best time-mean RMSE, EAKF-RN & Additional observation \\
+\midrule
+Full observations & 0.5605 (\(l_c=0.1,\lambda=1.10\)) & \textbf{0.5586} (same setting) & At \((l_c=0.4,\lambda=1.05)\), EAKF is about 3.3 while EAKF-RN is about 1.6; at \((l_c=0.3,\lambda=1.25)\) EAKF diverges while RN does not \\
+Half observations & 0.9515 (\(l_c=0.1,\lambda=1.20\)) & \textbf{0.9474} (\(l_c=0.1,\lambda=1.20\)) & EAKF diverges in 24 of 30 parameter combinations; EAKF-RN diverges in 0 \\
+Quarter observations & 1.9908 (\(l_c=0.1,\lambda=1.05\)) & \textbf{1.9860} (\(l_c=0.1,\lambda=1.10\)) & EAKF diverges in 17 of 30 parameter combinations; EAKF-RN diverges in 0 \\
+Eighth observations & 2.9619 (\(l_c=0.1,\lambda=1.00\)) & \textbf{2.9556} (\(l_c=0.1,\lambda=1.00\)) & Both are stable, but RN remains slightly better \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This table says something quite specific: residual nudging usually gives only a modest improvement in the best metric, but it gives a large improvement in robustness. Its real value is to keep the filter from dying, not to transform an already well-tuned optimum into something dramatically better.
+
+\paragraph{Table 2: spectrum smoothing helps much more when the Lorenz-96 regime is genuinely turbulent.}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.6cm} >{\raggedright\arraybackslash}p{2.6cm} >{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}p{3.3cm}}
+\toprule
+Lorenz-96 setup & Observations / ensemble & Baseline ETKF & ETKF + spectrum smoothing \\
+\midrule
+Weak turbulence \(F=4\) & 100\% observations, \(K=40\) & \textbf{0.0027} & 0.0043 \\
+Moderate turbulence \(F=8\) & 25\% observations, \(K=10\) & 4.5024 & \textbf{3.0801} \\
+Moderate turbulence \(F=8\) & 50\% observations, \(K=30\) & 3.2940 & \textbf{0.2186} \\
+Strong turbulence \(F=16\) & 100\% observations, \(K=40\) & 4.3081 & \textbf{0.3122} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The point is not that spectrum smoothing always wins. It does not. The point is that when Lorenz-96 has a clear turbulent spectral regime, smoothing the ensemble spectrum can markedly reduce sampling error. In weakly turbulent or lower-dimensional settings, the gain can be marginal or even negative.
+
+\paragraph{Table 3: representative results for adaptive tuning, score filtering, and learned analysis maps.}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{4.3cm} >{\raggedright\arraybackslash}p{4.8cm} >{\raggedright\arraybackslash}p{2.1cm}}
+\toprule
+Paper & Comparable setting inside the paper & Reported result & Main takeaway \\
+\midrule
+Attia \& Constantinescu (2018) & two-layer Lorenz-96; benchmark grid with fixed space/time tuning & Best benchmark is \textbf{RMSE = 0.170} at \(\lambda=1.5\), \(l=0.5\) & One must first understand what a good fixed setting looks like before adaptive tuning can be judged fairly \\
+Bao, Zhang, Zhang (2023) & Hyperparameters tuned in 100D, then transferred to \(10^6\)-dimensional Lorenz-96 & Best LETKF sets: \((1.1,4),(1.0,2),(1.1,3)\); best EnSF sets: \((\epsilon_a,\epsilon_b)=(0.5,0.025),(0.6,0.025),(0.5,0.05)\); at \(10^6\) dimensions EnSF takes about \textbf{5 s} per GPU step versus about 300 s for LETKF & EnSF is attractive not only because of accuracy, but because it is more stable under hyperparameter changes and more GPU-friendly \\
+Bocquet et al. (2024) & 40D Lorenz-96; classical DA versus learned analysis maps & EnKF-N (\(N_e=20\)): 0.191; EnKF-N (\(N_e=40\)): \textbf{0.179}; DAN (\(N_e=1,N_f=40\)): 0.191; DAN (\(N_e=1,N_f=100\)): 0.185; 3D-Var: 0.40 & A learned single-forecast analysis map can come surprisingly close to a well-tuned EnKF \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Table 4: the hybrid PF--EnKF paper reads almost like a boundary-condition manual.}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}p{3.7cm} >{\raggedright\arraybackslash}p{4.0cm}}
+\toprule
+Setting & Best reported parameters & Gain relative to ESRF & Interpretation \\
+\midrule
+\(N=400\) multiscale Lorenz-96 & Pure ESRF: \(r=0.026,L=209\); SIR-ESRF: \(r=0.06,L=279\); BSIR-ESRF: larger \(L\) & The methods are close; the hybrid does not clearly beat ESRF yet & The ensemble is still not large enough for the particle step to buy much \\
+\(N=1200\) multiscale Lorenz-96 & Pure ESRF: \(r=0.015,L=250\); SIR-ESRF: \(r=0.04,L=316,\text{ESS}=757\); BSIR-ESRF: \(r=0.02,L=319,\text{ESS}=642\) & BSIR-ESRF improves CRPS and RMSE by about \textbf{5\%--10\%} over ESRF and SIR-ESRF & The hybrid is mainly useful in medium nonlinearity and often needs a larger ensemble before it really wins \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Putting the tables together yields a more useful conclusion than a mere list of method names.}
+The innovations in Lorenz-96 papers are not random decorative add-ons. Each one is aimed at a distinct failure mode: LETKF addresses high-dimensional local structure, residual nudging addresses instability, adaptive inflation/localization addresses manual tuning burden, spectrum smoothing addresses the spectral structure of sampling error, hybrid PF--EnKF addresses medium non-Gaussianity, and EnSF or learned analysis maps challenge the covariance representation itself.
+
+\paragraph{The practical conclusion.}
+If the question is ``what should one try first for Lorenz-96?'', the literature-backed answer is still:
+\begin{quote}
+Start with a localized ensemble Kalman method, then get localization and inflation under control before reaching for more exotic machinery.
+\end{quote}
+
+The more exotic machinery becomes interesting when observations are strongly nonlinear, when ensemble sizes are severely limited, or when one wants to reduce the amount of manual tuning. A compact list of primary papers appears in \hyperref[app:lorenz-lit]{Appendix~\ref*{app:lorenz-lit}}.
+
+\section{A Group Chat Among Five Students}
+
+The bottleneck becomes easier to feel when several mathematical temperaments share the same table. Brief role cards for Student A through Student E are collected in \hyperref[app:role-cards]{Appendix~\ref*{app:role-cards}}; here, in the main text, we simply listen to how one set of equations sounds in five different voices.
+
+\studenta{What still catches me off guard is how calm the filter looks on paper. Predict, correct, repeat. The notation is almost serene. Nothing in the formula itself seems eager to announce trouble.}
+\studentb{The machine is less impressionable. It sees an \(n \times n\) covariance that has to be stored, pushed forward, multiplied, and factored. Once you begin counting bytes and flops, the room feels different.}
+\studentc{There is a distinction worth keeping clean. For the linear-Gaussian model, the mathematics remains exact. What becomes fragile is not the logic, but our ability to carry it out at scale.}
+\studentd{And in a spatial model, the covariance acquires a very concrete meaning. It is not merely a ledger of variances. It is a record of how one part of the grid leans on another, how one location moves in sympathy with the rest. That record grows astonishingly quickly.}
+\studente{So even before runtime measurements appear, the geometry is already uneven: the state grows linearly with system size, the dense covariance grows quadratically, and the heaviest algebra often grows cubically. That is the whole tension in one line.}
+
+\studenta{The \(100 \times 100\) grid example makes that tension oddly vivid. Ten thousand state variables still sound manageable. But the phrase ``one hundred million covariance entries'' lands rather differently.}
+\studentb{Exactly. And that is only the storage bill. The more serious expense arrives when code begins forming \(F P F^\top\), assembling the innovation covariance, and solving the associated linear systems. Those are not background chores. They dominate the update.}
+\studentc{Which is also why the textbook car example feels so innocent. When \(n=2\), the innovation covariance is just a scalar, the matrix products are tiny, and one can very easily mistake small scale for general ease.}
+\studentd{Then the practical question quietly changes. It is no longer ``Can one write down the Kalman filter?'' Of course one can. The real question is which correlations are worth preserving, and which structure is trustworthy enough to exploit.}
+\studente{That is where the familiar escape routes enter with some dignity: sparsity, localization, low-rank structure, ensemble approximations, sequential updates. They are not patches pasted onto the theory. They are deliberate decisions about what kind of uncertainty one can afford to represent.}
+\studenta{I like that way of putting it. The subject feels less like a collapse of theory and more like a negotiation between fidelity and scale.}
+\studentb{Yes. If one insists on dense exactness everywhere, the bill is merciless. If one uses structure intelligently, the filter becomes workable again.}
+
+\section{What Engineers Do Instead}
+
+\subsection{Exploit Structure}
+
+If the state only has local interactions, then \(F\), \(Q\), or even \(P\) may be sparse or banded. A block-diagonal or banded approximation throws away weak long-range correlations and keeps only the ones that matter most.
+
+\subsection{Use Low-Rank Ideas}
+
+Sometimes the dominant uncertainty lives in a much smaller subspace than the ambient state dimension. Then one tracks only a low-rank factor, or one uses ensemble methods to approximate the covariance through samples instead of storing the full dense matrix.
+
+\subsection{Change the Algebra, Not the Goal}
+
+Square-root filters, information filters, sequential measurement updates, and ensemble Kalman filters all preserve the basic predict-correct philosophy. They differ mainly in how they represent uncertainty and which linear algebra burden they reduce.
+
+\subsection{The Trade-Off}
+
+Every escape route has a price:
+\begin{itemize}
+  \item Sparse or block approximations reduce cost but may miss long-range correlations.
+  \item Low-rank methods save memory but may underrepresent directions of uncertainty that matter later.
+  \item Ensemble methods avoid dense covariance storage but replace exactness by Monte Carlo approximation.
+  \item Sequential or factorized updates are cheaper only when the measurement model has exploitable structure.
+\end{itemize}
+
+\studentc{So there is no miracle version that is both exact, dense, and cheap in very high dimension?}
+\teacher{That is the correct conclusion. Large-scale Kalman filtering is mostly a story about choosing which structure you trust enough to exploit.}
+
+\section{A Short Executive Summary}
+
+The Kalman filter solves a clean inferential problem: combine model prediction with new measurements. In low dimension, that solution is elegant and fast. In high dimension, the obstacle is the covariance matrix. Dense covariance storage costs \(O(n^2)\), and dense propagation or factorization typically costs \(O(n^3)\). The solution in practice is not to abandon filtering, but to redesign the uncertainty representation so that the filter follows the problem's structure rather than fighting it.
+
+\appendix
+
+\section{Glossary of Terms}\label{app:glossary}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{10.2cm}}
+\toprule
+Term & Meaning in plain language \\
+\midrule
+\endhead
+State \(x_t\) & The hidden quantity we actually care about, such as position, velocity, temperature, or a parameter vector. \\
+Estimate \(\hat{x}_{t|t}\) & The filter's current best guess of the state after using observations up to time \(t\). \\
+Covariance \(P_{t|t}\) & A matrix describing how uncertain the estimate is and how different coordinates co-vary. \\
+Process noise \(Q\) & The uncertainty injected by imperfect dynamics or modeling mismatch. \\
+Measurement noise \(R\) & The uncertainty produced by the sensor. \\
+Innovation & The mismatch between what the filter predicted the sensor would see and what the sensor actually reported. \\
+Kalman gain \(K_t\) & The matrix that turns innovation into a correction of the state estimate. \\
+Dense matrix & A matrix whose entries are mostly nonzero, so generic matrix multiplication and factorization are expensive. \\
+Sparse matrix & A matrix with many zeros, allowing specialized algorithms that skip unnecessary work. \\
+Low-rank approximation & A compressed representation that keeps only the dominant directions of variation. \\
+Observation dimension \(m\) & The number of numbers returned by the sensor at one update step. \\
+Computational bottleneck & The operation whose cost dominates runtime or memory, making the direct method impractical. \\
+\bottomrule
+\end{longtable}
+
+\section{Role Cards for the Group Chat}\label{app:role-cards}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{2.1cm} >{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{4.1cm}}
+\toprule
+Name & Background & Personality & Academic style \\
+\midrule
+\endhead
+Student A & MIT mathematics undergraduate & Quick to notice elegance, patient with abstraction, quietly enthusiastic & Begins from structure and intuition, then watches how a clean theorem survives contact with examples \\
+Student B & Computer science PhD student & Dry, pragmatic, and unusually alert to hidden cost & Tests ideas against memory traffic, runtime, and implementation burden before admiring the algebra \\
+Student C & Stanford mathematics auditing student & Reflective, precise, and fond of careful distinctions & Separates conceptual validity from computational feasibility and refines the boundary between them \\
+Student D & PKU visiting student & Warm, visual, and naturally drawn to large-scale structure & Understands formulas by mapping them back to grids, fields, geometry, and spatial interaction \\
+Student E & THU visiting student & Composed, synthesis-minded, and engineeringly concise & Compresses long arguments into design choices and keeps theory tied to workable approximations \\
+\bottomrule
+\end{longtable}
+
+\section{Classic Examples}\label{app:classic-examples}
+
+\subsection{Classical Constant-Velocity Tracking Example}\label{app:classic-1d}
+
+We use the familiar two-state model
+\[
+x_t =
+\begin{bmatrix}
+p_t\\
+v_t
+\end{bmatrix},
+\qquad
+F =
+\begin{bmatrix}
+1 & 1\\
+0 & 1
+\end{bmatrix},
+\qquad
+H =
+\begin{bmatrix}
+1 & 0
+\end{bmatrix}.
+\]
+
+Suppose the previous filtered estimate is
+\[
+\hat{x}_{t-1|t-1} =
+\begin{bmatrix}
+10\\
+1
+\end{bmatrix},
+\qquad
+P_{t-1|t-1} =
+\begin{bmatrix}
+4 & 1\\
+1 & 1
+\end{bmatrix}.
+\]
+Choose
+\[
+Q =
+\begin{bmatrix}
+0.2 & 0.1\\
+0.1 & 0.1
+\end{bmatrix},
+\qquad
+R = [1],
+\qquad
+y_t = 12.
+\]
+
+\paragraph{Prediction.}
+The predicted mean is
+\[
+\hat{x}_{t|t-1}
+=
+F\hat{x}_{t-1|t-1}
+=
+\begin{bmatrix}
+11\\
+1
+\end{bmatrix}.
+\]
+
+The predicted covariance is
+\[
+P_{t|t-1}
+=
+F P_{t-1|t-1} F^\top + Q
+=
+\begin{bmatrix}
+7.2 & 2.1\\
+2.1 & 1.1
+\end{bmatrix}.
+\]
+
+\paragraph{Correction.}
+The predicted observation is
+\[
+H\hat{x}_{t|t-1} = 11,
+\]
+so the innovation is
+\[
+\tilde{y}_t = y_t - H\hat{x}_{t|t-1} = 1.
+\]
+
+The innovation covariance is
+\[
+S_t = H P_{t|t-1} H^\top + R = 7.2 + 1 = 8.2.
+\]
+
+The Kalman gain is
+\[
+K_t
+=
+P_{t|t-1} H^\top S_t^{-1}
+=
+\frac{1}{8.2}
+\begin{bmatrix}
+7.2\\
+2.1
+\end{bmatrix}
+\approx
+\begin{bmatrix}
+0.8780\\
+0.2561
+\end{bmatrix}.
+\]
+
+The updated estimate becomes
+\[
+\hat{x}_{t|t}
+=
+\hat{x}_{t|t-1} + K_t \tilde{y}_t
+\approx
+\begin{bmatrix}
+11.8780\\
+1.2561
+\end{bmatrix}.
+\]
+
+The updated covariance is
+\[
+P_{t|t}
+=
+P_{t|t-1} - K_t S_t K_t^\top
+\approx
+\begin{bmatrix}
+0.8780 & 0.2561\\
+0.2561 & 0.5622
+\end{bmatrix}.
+\]
+
+This example is easy enough to compute by hand. It shows why the Kalman filter is pedagogically attractive. It also shows why the small example can mislead intuition about computational cost: everything here is tiny because \(n=2\).
+
+\subsection{Classical Large-State Example: Grid-Based Data Assimilation}\label{app:classic-grid}
+
+Consider a \(100 \times 100\) temperature grid. The state dimension is \(n=10{,}000\). Assume a dense covariance.
+
+\begin{itemize}
+  \item The covariance has \(10^8\) entries.
+  \item One dense covariance matrix needs about \(0.8\) GB in double precision.
+  \item A dense covariance prediction behaves like \(O(n^3) \approx 10^{12}\) arithmetic-scale units.
+\end{itemize}
+
+This is the classical reason large-scale data assimilation uses localization, ensemble approximations, reduced-order models, or other structure-aware variants. The filter equations survive, but the dense implementation does not.
+
+\subsection{Benchmark-Specific Example: Lorenz-63 Versus Lorenz-96}\label{app:classic-lorenz}
+
+It is useful to compare two benchmark families that are often discussed under the same broad heading of ``nonlinear filtering,'' even though they stress very different weaknesses.
+
+\paragraph{Lorenz-63.}
+This system has only three state variables, so dimension is not the main enemy. The central difficulty is strong nonlinearity and sensitive dependence on initial conditions. In this case:
+\begin{itemize}
+  \item EKF may work only when the local linearization remains trustworthy,
+  \item UKF is attractive because the dimension is small enough to afford sigma-point propagation,
+  \item particle methods are not yet crushed by dimension in the same way they would be for a 100-dimensional state.
+\end{itemize}
+The problem is therefore mainly one of \emph{nonlinearity}.
+
+\paragraph{Lorenz-96.}
+This system is widely used as a higher-dimensional data-assimilation benchmark. The state may have 40, 80, or more coordinates, with mostly local coupling. Here the difficulty is different:
+\begin{itemize}
+  \item brute-force EKF-style covariance propagation becomes expensive,
+  \item dense covariance representations become increasingly artificial because most meaningful correlations are local or flow-dependent,
+  \item ensemble methods with localization and inflation fit the geometry of the problem better.
+\end{itemize}
+The problem is therefore one of \emph{nonlinearity plus scalable uncertainty representation}.
+
+\paragraph{The practical split.}
+Lorenz-63 teaches why naive linearization can fail even in very small dimension. Lorenz-96 teaches why, once dimension grows, the central question is no longer merely ``linear or nonlinear.'' It becomes ``what uncertainty representation matches the structure of this system?''
+
+\section{Selected Lorenz-96-Oriented Primary Sources}\label{app:lorenz-lit}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{4.3cm} >{\raggedright\arraybackslash}p{9.1cm}}
+\toprule
+Paper & Main takeaway for this note \\
+\midrule
+\endhead
+\href{https://arxiv.org/abs/physics/0203058}{Ott et al. (2002), \emph{A Local Ensemble Kalman Filter for Atmospheric Data Assimilation}} & Introduces the local EnKF idea: forecast uncertainty in each local region lies in a much lower-dimensional subspace, so one can replace a global expensive update by many local low-dimensional analyses; illustrated on Lorenz-96. \\
+\href{https://arxiv.org/abs/physics/0511236}{Hunt, Kostelich, and Szunyogh (2005), \emph{Efficient Data Assimilation for Spatiotemporal Chaos: a Local Ensemble Transform Kalman Filter}} & Makes LETKF practical for large spatiotemporally chaotic systems; the emphasis is explicitly on ease of use and computational speed, not on preserving a full dense covariance. \\
+\href{https://arxiv.org/abs/1210.1318}{Luo and Hoteit (2012), \emph{Ensemble Kalman filtering with residual nudging}} & In the 40-dimensional Lorenz-96 model, residual nudging improves accuracy or stability, especially when the ensemble is small and the filter risks becoming overconfident. \\
+\href{https://arxiv.org/abs/1806.10655}{Attia and Constantinescu (2018), \emph{An Optimal Experimental Design Framework for Adaptive Inflation and Covariance Localization for Ensemble Filters}} & Shows that inflation and localization should be treated as central tunable objects rather than fixed folklore parameters; demonstrated on two-layer Lorenz-96. \\
+\href{https://arxiv.org/abs/2404.00154}{Choi and Lee (2024), \emph{Sampling error mitigation through spectrum smoothing}} & Proposes spectrum smoothing as a nonintrusive way to mitigate sampling error; for Lorenz-96 it effectively induces spatially varying localization and inflation. \\
+\href{https://arxiv.org/abs/2309.00983}{Bao, Zhang, and Zhang (2023), \emph{An Ensemble Score Filter for Tracking High-Dimensional Nonlinear Dynamical Systems}} & Represents a newer direction for highly nonlinear high-dimensional filtering; on Lorenz-96 it is positioned as an alternative when standard EnKF-style Gaussian assumptions become too restrictive. \\
+\href{https://arxiv.org/abs/2006.04699}{Robinson and Grooms (2020), \emph{A hybrid particle-ensemble Kalman filter for problems with medium nonlinearity}} & Targets the regime where the forecast is noticeably non-Gaussian but a full particle filter would be too fragile; relevant as a Lorenz-96-motivated middle ground between EnKF and particle filtering. \\
+\href{https://arxiv.org/abs/2408.04739}{Bocquet et al. (2024), \emph{Accurate deep learning-based filtering for chaotic dynamics by identifying instabilities without an ensemble}} & Suggests that, at least for Lorenz-96, one can sometimes learn an analysis step that rivals a tuned EnKF without explicitly propagating an ensemble, by capturing dynamically relevant perturbation directions. \\
+\href{https://arxiv.org/abs/2603.03926}{Ait-El-Fquih and Hoteit (2026), \emph{A Structurally Localized Ensemble Kalman Filtering Approach}} & Shows that even recent work is still refining localization rather than discarding it: the goal is to make locality intrinsic to the analysis step and reduce the amount of ad hoc localization tuning. \\
+\bottomrule
+\end{longtable}
+
+\section{Lorenz-96 Code Handles and Reproducibility}\label{app:lorenz-code}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{3.1cm} >{\raggedright\arraybackslash}p{3.8cm} >{\raggedright\arraybackslash}p{6.5cm}}
+\toprule
+Method & Main extra modules in code & Most useful implementation note \\
+\midrule
+\endhead
+LETKF / local EnKF & local observation indices, local forecast anomalies, ensemble-space transform, scatter/gather from local to global state & The real loop is over local windows, not over a global covariance matrix. If the code still stores a dense global \(P\), it is no longer following the mainstream Lorenz-96 practice. \\
+Residual nudging & residual norm check, threshold logic, post-analysis convex blending of the mean & This is best thought of as a stability add-on to an existing EAKF/EnKF code path; it usually does not require rewriting the covariance update. \\
+Adaptive inflation / localization & objective function, gradients, bounded optimizer, per-cycle parameter reinjection & The difficult part is not the Kalman update itself but the outer optimization loop. Without robust stopping and bounds, the method becomes numerically brittle very quickly. \\
+Spectrum smoothing & FFT / inverse FFT, spectral rescaling, smoothed target spectrum, interface back to ETKF & Conceptually it is still ETKF outside. The main new engineering burden is keeping the spectral rescaling and the physical-space reconstruction consistent. \\
+Hybrid PF--EnKF & likelihood splitting, ESS target, resampling, random orthogonal transform, then ESRF update & The first particle step must be weak enough to avoid collapse, but strong enough to make the remaining posterior closer to Gaussian before the ESRF stage. \\
+EnSF & \href{https://github.com/zezhongzhang/EnSF}{public repository} with \texttt{ScoreFilter/diffusion.py}, \texttt{ScoreFilter/utils.py}, \texttt{run\_all\_EnSF/}, and \texttt{run\_all\_LETKF/} & The repository is useful precisely because EnSF and LETKF are organized side by side. The Lorenz-96 drift, RK4 propagation, nonlinear observation score, and parameter sweeps can all be checked in one place. \\
+Learned analysis map & CNN analysis operator, long-trajectory training set, truncated backpropagation, online single-step inference & Training looks like sequence learning, but deployment looks like a local correction operator. The compute burden is shifted from repeated linear algebra to offline training. \\
+\bottomrule
+\end{longtable}
+
+\section{Lorenz-96 Supplementary Ablations and Tables}\label{app:lorenz-results}
+
+\begin{longtable}{>{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{3.8cm} >{\raggedright\arraybackslash}p{6.4cm}}
+\toprule
+Paper & Variables that were actually changed & What the paper really shows \\
+\midrule
+\endhead
+\href{https://arxiv.org/abs/1210.1318}{Luo and Hoteit (2012)} & observation sparsity, \(l_c\), \(\lambda\), \(\beta\), ensemble size & In the half-observation scenario, the plain EAKF diverges in \(24\) out of \(30\) tested parameter combinations, while EAKF-RN diverges in none; in the quarter-observation scenario the count is \(17/30\) versus \(0/30\). The main gain of residual nudging is therefore robustness, not a dramatic reduction of the already best RMSE. \\
+\href{https://arxiv.org/abs/1806.10655}{Attia and Constantinescu (2018)} & inflation penalty \(\alpha\), localization penalty \(\gamma\), ensemble size, observation noise & The paper first establishes a fair benchmark on the two-layer Lorenz-96 model: \(\lambda=1.5\), \(l=0.5\), with average RMSE \(\mathbf{0.170}\). Only after that does it judge the adaptive methods. The adaptive-inflation L-curve places a reasonable \(\alpha\) near \(0.0015\), while adaptive localization shows that an observation-space formulation can be much more expensive than the state-space one. \\
+\href{https://arxiv.org/abs/2404.00154}{Choi and Lee (2024)} & ensemble size \(K\), observation density, localization/inflation, whether spectrum smoothing is used & The benefit is strongest precisely where sampling error should be strongest. For example, at \(F=8\), 25\% observations, \(K=40\), RMSE drops from \(3.6804\) to \(\mathbf{0.5102}\); at \(F=16\), 100\% observations, \(K=40\), it drops from \(4.3081\) to \(\mathbf{0.3122}\). But at weak turbulence \(F=4\), 25\% observations, \(K=40\), the baseline is actually slightly better: \(\mathbf{0.0061}\) versus \(0.0069\). \\
+\href{https://arxiv.org/abs/2006.04699}{Robinson and Grooms (2020)} & ensemble size \(N\), ESS threshold, inflation \(r\), localization radius \(L\), blurred versus unblurred observations & When \(N<400\), the three filters are nearly indistinguishable, which says the main bottleneck is still sampling error. Only at \(N=1200\) does BSIR-ESRF become consistently better than ESRF, and even then the gain is about \(5\%\) to \(10\%\). The paper is explicit that hybrid particle methods often need a larger ensemble than a pure EnKF before they become worthwhile. \\
+\href{https://arxiv.org/abs/2408.04739}{Bocquet et al. (2024)} & ensemble size \(N_e\), CNN filters \(N_f\), observation noise, observation density, state dimension \(N_x\) & DAN already reaches aRMSE around \(0.19\) with \(N_e=1\), and improves to \(0.185\) when \(N_f=100\). More interestingly, the learned operator trained at \(N_x=40\) keeps roughly the same aRMSE when transferred to \(N_x \in [20,160]\), which suggests the learned structure is local and dimension-robust rather than a brittle global fit. \\
+\href{https://arxiv.org/abs/2309.00983}{Bao, Zhang, and Zhang (2023)} & dimension \(100,200,10^6\), ensemble size, SDE steps, nonlinear observation, mini-batch size & The paper makes the scaling claim concrete. The \href{https://github.com/zezhongzhang/EnSF}{public code} exposes \texttt{Nt\_SDE}, \texttt{ensemble\_size}, \texttt{inflation}, and \texttt{eps\_a}/\texttt{eps\_b} directly in CSV and notebook form, while the paper reports about \(5\) seconds per GPU step for EnSF versus about \(300\) seconds for LETKF in the \(10^6\)-dimensional Lorenz-96 test. \\
+\bottomrule
+\end{longtable}
+
+\section{Detailed Derivation Steps}\label{app:derivation-steps}
+
+\subsection{Why Dense Covariance Prediction Scales Like \(O(n^3)\)}\label{app:derivation-cost}
+
+We start from
+\[
+P_{t+1|t} = F P_{t|t} F^\top + Q,
+\]
+with \(F, P_{t|t}, Q \in \mathbb{R}^{n \times n}\), all treated as dense.
+
+\proofstep{enter}{Focus on the matrix dimensions first. Every object except the final addition is an \(n \times n\) dense matrix.}
+\[
+\eqfocusa{P_{t+1|t}} = \eqfocusb{F P_{t|t} F^\top} + \eqfocusc{Q}.
+\]
+
+\proofstep{rw}{Multiply the first two dense matrices.}
+\[
+M_1 = \eqfocusb{F P_{t|t}}, \qquad M_1 \in \mathbb{R}^{n \times n}.
+\]
+A dense \(n \times n\) by dense \(n \times n\) multiplication needs on the order of \(n^3\) scalar operations.
+
+\proofstep{rw}{Multiply the result by \(F^\top\).}
+\[
+M_2 = \eqfocusb{M_1 F^\top}, \qquad M_2 \in \mathbb{R}^{n \times n}.
+\]
+This is another dense matrix multiplication, again of order \(n^3\).
+
+\proofstep{done}{Add the process noise covariance.}
+\[
+\eqfocusa{P_{t+1|t}} = \eqfocusb{M_2} + \eqfocusc{Q}.
+\]
+The addition itself costs only \(O(n^2)\), which is smaller than the two cubic multiplication steps.
+
+Therefore the dense covariance prediction cost is dominated by
+\[
+O(n^3) + O(n^3) + O(n^2) = O(n^3).
+\]
+
+\subsection{Why the Update Can Also Become Cubic}\label{app:derivation-update}
+
+The update uses
+\[
+S_t = H P_{t|t-1} H^\top + R,
+\qquad
+K_t = P_{t|t-1} H^\top S_t^{-1}.
+\]
+Assume \(H \in \mathbb{R}^{m \times n}\).
+
+\proofstep{enter}{First form the innovation covariance.}
+\[
+\eqfocusa{S_t} = \eqfocusb{H P_{t|t-1} H^\top} + \eqfocusc{R}.
+\]
+
+\proofstep{rw}{Compute \(H P_{t|t-1}\).}
+\[
+N_1 = \eqfocusb{H P_{t|t-1}}, \qquad N_1 \in \mathbb{R}^{m \times n}.
+\]
+This dense multiplication costs \(O(m n^2)\).
+
+\proofstep{rw}{Multiply by \(H^\top\).}
+\[
+N_2 = \eqfocusb{N_1 H^\top}, \qquad N_2 \in \mathbb{R}^{m \times m}.
+\]
+This costs \(O(m^2 n)\), which is bounded by \(O(m n^2)\) when \(m \le n\).
+
+\proofstep{have}{Now solve with the \(m \times m\) innovation covariance.}
+\[
+\eqfocusa{S_t} = \eqfocusb{N_2} + \eqfocusc{R}.
+\]
+Factoring or inverting a dense \(m \times m\) matrix costs \(O(m^3)\).
+
+\proofstep{done}{Combine the two dominant contributions.}
+\[
+\text{update cost} \approx O(m n^2 + m^3).
+\]
+When \(m\) is of the same order as \(n\), this becomes \(O(n^3)\).
+
+\subsection{Why the Small Example Feels Easy}\label{app:derivation-small}
+
+Return to the constant-velocity model in \hyperref[app:classic-1d]{Appendix~\ref*{app:classic-1d}}. There \(n=2\) and \(m=1\). So:
+\begin{itemize}
+  \item covariance storage is only \(2^2 = 4\) numbers,
+  \item dense cubic work is on the order of \(2^3 = 8\),
+  \item the innovation covariance is just a scalar.
+\end{itemize}
+
+That is why the textbook example feels effortless. Nothing is wrong with the theory. The scale is simply too small for the computational burden to be visible.
+
+\end{document}
