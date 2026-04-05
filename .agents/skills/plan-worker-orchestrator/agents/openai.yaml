@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plan Worker Orchestrator"
+  short_description: "先写 plan/verify，再按 ownership 派发 workers 并做门禁复核。"
+  default_prompt: "使用 $plan-worker-orchestrator 为当前任务先创建 plan.md 和 verify.md，再按 ownership 并发派发 worker，并在最终完成前亲自复核门禁。"

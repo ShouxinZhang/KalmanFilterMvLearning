@@ -1,0 +1,451 @@
+\documentclass[12pt,a4paper]{article}
+\input{preamble.tex}
+
+\title{Foundational Notes on RNN and GRU\\
+\large From Naive Sequential Memory to Gated Sequence Modeling}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\section{Why Sequence Memory Matters}
+
+Many machine learning models are comfortable when every input can be treated as a fixed bag of numbers. A house price predictor may take area, age, and location all at once. A standard classifier may examine one image and then stop. Sequence problems are different. Meaning now depends on order, and order means the model must remember.
+
+Consider the short sentence
+\[
+\texttt{``the movie is not good''}.
+\]
+If one only looks at the last word \texttt{good}, the sentence appears positive. The true meaning depends on something that happened earlier, namely the word \texttt{not}. The practical problem is therefore simple to state:
+\begin{quote}
+How can a model read a sequence one step at a time while carrying forward just enough memory of the past?
+\end{quote}
+
+Recurrent neural networks were introduced as a direct answer to that question. A plain RNN keeps a hidden state, updates it whenever a new token arrives, and uses that state as a compressed summary of the past. A GRU keeps the same overall idea, but adds gates so that the model can decide what to retain and what to overwrite.
+
+\section{A Running Example}
+
+Throughout this note, imagine a sentiment classifier that reads one word at a time and must decide whether a review is positive or negative.
+
+We compare two sentences:
+\[
+\texttt{``the movie is good''},
+\qquad
+\texttt{``the movie is not good''}.
+\]
+
+The final task is identical in both cases: output one label after reading the full sentence. The difficulty lies in memory. The model should not merely react to the latest word. It should build a small internal summary as the sentence unfolds.
+
+For intuition, let the hidden state be a single real number:
+\begin{itemize}
+  \item positive values suggest positive sentiment,
+  \item negative values suggest negative sentiment,
+  \item values near zero mean the model is still uncertain.
+\end{itemize}
+
+This scalar example is too small for real applications, but it is ideal for understanding the logic.
+
+\section{The Black-Box View}
+
+\subsection{Input, Process, Output}
+
+Both RNN and GRU can be described as the same three-stage machine:
+
+\begin{enumerate}
+  \item \textbf{Input.} Receive the next element \(x_t\) of the sequence.
+  \item \textbf{Process.} Combine \(x_t\) with a memory state \(h_{t-1}\) coming from the previous step.
+  \item \textbf{Output.} Produce a new memory state \(h_t\), and possibly an external output \(\hat{y}_t\) or a final prediction \(\hat{y}\).
+\end{enumerate}
+
+The only major difference is \emph{how} the new memory is formed. A plain RNN uses one direct nonlinear update. A GRU uses gates to control memory flow.
+
+\subsection{Why This Is Different from an Ordinary Feedforward Network}
+
+In an ordinary feedforward network, the input is processed once and then discarded. In an RNN-like model, the hidden state becomes a moving summary:
+\begin{quote}
+the old state tells the model what it already knows, and the new input tells the model what has just happened.
+\end{quote}
+
+This is what makes recurrent models suitable for text, speech, time series, trajectories, and event streams.
+
+\section{The Plain RNN}
+
+\subsection{Basic Mathematical Model}
+
+The standard plain RNN update is
+\[
+h_t = \phi(W_x x_t + W_h h_{t-1} + b),
+\]
+where
+\begin{itemize}
+  \item \(x_t\) is the input at time \(t\),
+  \item \(h_{t-1}\) is the previous hidden state,
+  \item \(W_x\) and \(W_h\) are learned weight matrices,
+  \item \(b\) is a bias vector,
+  \item \(\phi\) is usually \(\tanh\) or another nonlinear function.
+\end{itemize}
+
+If we want a final classification score, we may use
+\[
+\hat{y} = \sigma(W_y h_T + c),
+\]
+after the last step \(T\).
+
+The meaning of the formula is straightforward. At time \(t\), the model mixes two sources of information:
+\begin{itemize}
+  \item what it sees now,
+  \item what it remembers from before.
+\end{itemize}
+
+The output is a new summary of the prefix \((x_1,\dots,x_t)\).
+
+\subsection{A Naive Numerical Walkthrough}
+
+Let the hidden state be one-dimensional and use
+\[
+h_t = \tanh(0.8x_t + 0.5h_{t-1}),
+\qquad
+h_0 = 0.
+\]
+
+Assign simple scalar inputs:
+\[
+x(\texttt{good}) = 1,\qquad
+x(\texttt{not}) = -1,\qquad
+x(\texttt{movie}) = x(\texttt{is}) = 0.
+\]
+
+For the sentence
+\[
+\texttt{``movie is good''},
+\]
+the updates are
+\[
+h_1 = \tanh(0) = 0,\qquad
+h_2 = \tanh(0) = 0,\qquad
+h_3 = \tanh(0.8) \approx 0.66.
+\]
+The final state is positive, which is sensible.
+
+Now consider
+\[
+\texttt{``movie is not good''}.
+\]
+Then
+\[
+h_1 = 0,\qquad
+h_2 = 0,\qquad
+h_3 = \tanh(-0.8) \approx -0.66.
+\]
+At the final word \texttt{good},
+\[
+h_4 = \tanh(0.8 + 0.5(-0.66))
+     = \tanh(0.47)
+     \approx 0.44.
+\]
+
+This is the central weakness of a plain RNN. The last positive word pulls the state back toward positivity. The earlier negation is present, but only weakly. If the sentence were longer, that older signal could fade even further.
+
+\subsection{Algorithmic View}
+
+For a sequence \(x_1,\dots,x_T\), the plain RNN algorithm is:
+
+\begin{enumerate}
+  \item Initialize \(h_0\).
+  \item For \(t=1,\dots,T\), compute \(h_t = \phi(W_x x_t + W_h h_{t-1} + b)\).
+  \item Use \(h_T\) or all states \((h_t)\) to produce the task output.
+\end{enumerate}
+
+Training usually proceeds by backpropagation through time: unroll the recurrence across the sequence, compute the loss, and differentiate through all time steps.
+
+\section{Why the Plain RNN Struggles}
+
+\subsection{The Intuition Behind Vanishing Memory}
+
+Each update compresses the old state into a new one. If that compression repeatedly shrinks useful signals, then distant information becomes hard to recover. One may summarize the problem in a single sentence:
+\begin{quote}
+the model keeps rewriting its notebook, and after many rewrites the old sentence becomes too faint to read.
+\end{quote}
+
+This is why plain RNNs often struggle with long-range dependence. They are elegant and conceptually important, but they do not protect memory very well.
+
+\subsection{Practical Consequences}
+
+In practice, a plain RNN may work reasonably when
+\begin{itemize}
+  \item sequences are short,
+  \item the important context is local,
+  \item the computational budget is tight and a small model is acceptable.
+\end{itemize}
+
+It becomes less attractive when the task requires carrying a critical signal across many steps.
+
+\section{The GRU}
+
+\subsection{Core Idea}
+
+The GRU, or Gated Recurrent Unit, keeps the recurrent structure but inserts gates. These gates are learned numbers between \(0\) and \(1\) that decide how strongly new information should enter and how strongly old information should remain.
+
+The practical question answered by the GRU is not
+\emph{``how do we create a hidden state?''}
+but rather
+\emph{``how do we update memory without erasing useful history too quickly?''}
+
+\subsection{Basic Mathematical Model}
+
+A common GRU form is
+\[
+z_t = \sigma(W_z x_t + U_z h_{t-1} + b_z),
+\]
+\[
+r_t = \sigma(W_r x_t + U_r h_{t-1} + b_r),
+\]
+\[
+\tilde{h}_t = \tanh(W_h x_t + U_h(r_t \odot h_{t-1}) + b_h),
+\]
+\[
+h_t = (1-z_t)\odot h_{t-1} + z_t \odot \tilde{h}_t.
+\]
+
+Here
+\begin{itemize}
+  \item \(z_t\) is the update gate,
+  \item \(r_t\) is the reset gate,
+  \item \(\tilde{h}_t\) is the candidate state,
+  \item \(\odot\) denotes elementwise multiplication.
+\end{itemize}
+
+These equations look longer than the plain RNN equation, but the intuition is simple:
+\begin{itemize}
+  \item the update gate decides whether to keep the old memory or replace it,
+  \item the reset gate decides how much of the old state should influence the candidate memory.
+\end{itemize}
+
+\subsection{Intuitive Algorithm}
+
+At each time step, the GRU behaves like this:
+
+\begin{enumerate}
+  \item Read the new input \(x_t\).
+  \item Compute a tentative new memory \(\tilde{h}_t\).
+  \item Ask how much of the old memory should be preserved.
+  \item Blend old memory and candidate memory to form \(h_t\).
+\end{enumerate}
+
+The blend is the key improvement. A plain RNN rewrites memory in one shot. A GRU performs a controlled overwrite.
+
+\subsection{A Naive Numerical Walkthrough}
+
+Return to the sentence
+\[
+\texttt{``movie is not good''}.
+\]
+
+Suppose the hidden state is again scalar and the network has already learned the following behavior:
+\begin{itemize}
+  \item after reading \texttt{not}, it stores a strong negative memory,
+  \item at filler words, it keeps most of that memory,
+  \item at a sentiment word such as \texttt{good}, it mixes the new evidence with the old context instead of fully overwriting it.
+\end{itemize}
+
+Let
+\[
+h_2 = 0,\qquad
+h_3 = -0.80
+\]
+after reading \texttt{not}. Now assume the next word is a weak filler and the GRU chooses
+\[
+z_4 = 0.10,\qquad
+\tilde{h}_4 = -0.40.
+\]
+Then
+\[
+h_4 = (1-0.10)(-0.80) + 0.10(-0.40) = -0.76.
+\]
+So the negative memory is mostly preserved.
+
+At the final word \texttt{good}, suppose the GRU computes
+\[
+z_5 = 0.60,\qquad
+\tilde{h}_5 = 0.20.
+\]
+Then
+\[
+h_5 = 0.40(-0.76) + 0.60(0.20) = -0.184.
+\]
+
+This final state is still slightly negative. That is much more plausible than the plain RNN output above. The positive word matters, but it does not erase the earlier negation.
+
+\section{RNN versus GRU}
+
+\subsection{High-Level Comparison}
+
+\begin{center}
+\begin{tabular}{p{3.2cm}p{5.1cm}p{5.1cm}}
+\toprule
+Aspect & Plain RNN & GRU \\
+\midrule
+Memory update & Direct overwrite by one nonlinear map & Gated blend of old and new memory \\
+Parameter count & Smaller & Larger \\
+Training stability & Often weaker on long sequences & Usually better \\
+Ability to preserve context & Limited & Stronger \\
+Interpretation & Simpler first model & More practical recurrent baseline \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Trade-Offs}
+
+The plain RNN remains valuable because it is the cleanest recurrent idea. It is easy to teach, easy to implement, and small in parameter count. But that simplicity comes with fragile memory.
+
+The GRU is usually the more practical choice when one wants a recurrent model and expects dependencies that are not purely local. The price is extra machinery and more parameters. One should therefore not think of the GRU as replacing the RNN conceptually. Rather, it is a repair to one of the RNN's main engineering weaknesses.
+
+\section{How These Models Are Trained}
+
+For both models, training follows the same outer loop:
+
+\begin{enumerate}
+  \item collect a dataset of sequences and targets,
+  \item run the model forward through each sequence,
+  \item compute a loss from the prediction error,
+  \item propagate gradients backward through the unrolled time steps,
+  \item update parameters by gradient descent or one of its variants.
+\end{enumerate}
+
+The difference is that the GRU usually passes useful gradients across longer spans more reliably, because its gates create better routes for memory preservation.
+
+\section{A Note on the Companion Code}
+
+The small sentiment demo that accompanies this note is intentionally easy. The dataset is tiny, the sentences are short, and the dependence pattern is simple. Under those conditions, a plain RNN and a GRU can look surprisingly similar, because both models can fit the task without being forced to manage truly long memory.
+
+That is why the toy demo should be read as a mechanism demo, not as a decisive benchmark. It helps the reader see how recurrent state is updated step by step, but it does \emph{not} by itself prove a large practical advantage for the GRU.
+
+To reveal the engineering difference more honestly, one needs a harder benchmark: longer sequences, longer-distance dependencies, or evaluation beyond the training length. In that regime, the GRU often becomes more stable and more reliable. But even there, the correct claim is still modest:
+\begin{quote}
+the GRU is often easier to train on harder memory problems, not guaranteed to dominate plain RNN on every small task.
+\end{quote}
+
+Our current companion code now includes such a harder benchmark in
+\texttt{code/long\_memory\_benchmark.py}. The training setup is intentionally asymmetric:
+the models are trained only on short sequences of length \(12\), but then evaluated on much longer lengths up to \(96\). The task is to remember one bit written near the start of the sequence and reproduce it only after a long stream of distractor tokens.
+
+In one representative run, the plain RNN achieved a mean accuracy of about \(0.502\) across the test lengths, while the GRU achieved about \(1.000\). The point of this number is not that GRU has won some universal contest. The point is narrower and more useful: once the task genuinely stresses long memory and length generalization, the engineering difference between direct recurrent overwrite and gated memory control becomes much easier to observe.
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Model & Train length & Mean accuracy across test lengths \\
+\midrule
+Plain RNN & \(12\) only & about \(0.502\) \\
+GRU & \(12\) only & about \(1.000\) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{A Unified State-Space View}
+
+\subsection{Why the Comparison Is Reasonable}
+
+At a high enough level, GRU-like models and Kalman filtering do share a family resemblance. Both process a stream one step at a time. Both carry forward an internal state. Both update that state using new information that arrives at the current step. In that broad sense, both can be placed inside a common state-update picture:
+\[
+\text{new state} = \text{update}(\text{old state}, \text{new input}).
+\]
+
+This is the right unifying statement. The weaker statement
+\emph{``both predict future actions''}
+is usually not correct. In many tasks, neither model is predicting an action at all. Rather, both are maintaining a useful internal description of what has happened so far.
+
+\subsection{How the Two State Updates Differ}
+
+For a Kalman filter, the internal state is an estimate of an underlying physical state, together with an uncertainty description. In a control setting, one often writes
+\[
+\hat{x}_{t|t-1} = f(\hat{x}_{t-1|t-1}, u_{t-1}),
+\qquad
+\hat{x}_{t|t} = \text{correct}(\hat{x}_{t|t-1}, y_t),
+\]
+where \(u_{t-1}\) is a control input and \(y_t\) is a new observation. The update is model-driven: the engineer specifies the dynamics and the measurement relation, and the filter uses them to estimate a latent state.
+
+For a GRU, the internal state is a learned hidden representation. Its update has the schematic form
+\[
+h_t = \text{GRUCell}(h_{t-1}, x_t),
+\]
+where \(x_t\) is the next token, sensor reading, or time-series value. The update is data-driven: instead of being hand-specified from physics, it is learned from examples.
+
+So the structural analogy is real:
+\begin{itemize}
+  \item both are recursive state updaters,
+  \item both compress the past into a current state,
+  \item both use the current input to revise that state.
+\end{itemize}
+
+But the operational difference is equally important:
+\begin{itemize}
+  \item a Kalman filter is an estimator with explicit uncertainty bookkeeping,
+  \item a GRU is a learned memory machine whose hidden state usually has no direct physical meaning.
+\end{itemize}
+
+\subsection{Connecting Back to the Running Example}
+
+In the sentiment example, the GRU hidden state stores a summary of the sentence prefix. After reading \texttt{not}, the state should carry a negative modifier forward so that the later word \texttt{good} is interpreted in context.
+
+In a Kalman-filter example, one might track the position and velocity of a robot. The filter carries forward its best current estimate, then revises it after receiving a noisy sensor measurement. The role of memory is therefore similar: the present state summarizes relevant past information before the next piece of data arrives.
+
+The difference is what that state means. In sentiment analysis, the hidden state is a useful learned summary for prediction. In robot tracking, the Kalman state aims to represent an external quantity that exists whether or not the estimator sees it perfectly.
+
+\subsection{The Practical Takeaway}
+
+If one wants a unified sentence, it is this:
+\begin{quote}
+Kalman filtering and GRU both belong to the broader class of sequential state-update methods, but one is a model-based estimator with uncertainty, while the other is a data-driven learned hidden-state updater.
+\end{quote}
+
+That viewpoint is useful because it prevents a false dichotomy. The two ideas are not identical, but they are not unrelated either. They sit on the same high-level ladder:
+\begin{enumerate}
+  \item keep a state,
+  \item update it as new data arrives,
+  \item use the updated state for estimation, prediction, or decision.
+\end{enumerate}
+
+\section{Where RNN and GRU Are Actually Used}
+
+\subsection{Typical Applications}
+
+These models appear naturally whenever data arrives in order:
+\begin{itemize}
+  \item language modeling and sentiment analysis,
+  \item speech and handwriting recognition,
+  \item sensor forecasting and anomaly detection,
+  \item medical time series,
+  \item user behavior modeling.
+\end{itemize}
+
+\subsection{A Simple Industrial Example}
+
+Imagine a factory machine with a temperature stream
+\[
+x_1, x_2, \dots, x_T.
+\]
+The task is to predict whether the machine will overheat in the next minute.
+
+A feedforward model that only looks at the current temperature may miss the trend. A recurrent model can remember that the temperature has been drifting upward for many steps. A GRU is especially useful if one short cooling event should not immediately erase the broader upward pattern.
+
+\section{What to Remember}
+
+The conceptual ladder is short:
+\begin{enumerate}
+  \item A sequence task requires memory.
+  \item A plain RNN creates memory through repeated hidden-state updates.
+  \item A GRU keeps the same recurrent idea, but makes memory updates selective through gates.
+\end{enumerate}
+
+If one sentence must summarize the difference, it is this:
+\begin{quote}
+A plain RNN always rewrites its memory, while a GRU learns when to preserve, forget, and refresh it.
+\end{quote}
+
+For a first encounter with sequence modeling, the RNN teaches the core idea. For many practical tasks, the GRU is the safer engineering choice.
+
+\end{document}
