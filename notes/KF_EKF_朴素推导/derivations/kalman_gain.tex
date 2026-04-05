@@ -1,15 +1,6 @@
-\documentclass[12pt,a4paper]{ctexart}
-\input{../preamble.tex}
+\section{Kalman 增益如何从创新里长出来}\label{app:kalman-gain}
 
-\title{细节推导：Kalman 增益如何从创新里长出来}
-\author{}
-\date{\today}
-
-\begin{document}
-
-\maketitle
-
-\section{目标}
+\subsection{目标}
 
 这一份细节推导只解决一件事：
 
@@ -40,7 +31,7 @@
   解出来。
 \end{enumerate}
 
-\section{第一步：创新并不等于真相，它是两部分的混合}
+\subsection{第一步：创新并不等于真相，它是两部分的混合}
 
 \proofstep{enter}{从创新定义开始：}
 
@@ -73,7 +64,7 @@
 \(\bm{H}=[1\ 0]\)
 时，传感器只直接看见位置误差，看不见速度误差。}
 
-\section{第二步：先算创新自己的协方差 \texorpdfstring{$\bm{S}_t$}{S_t}}
+\subsection{第二步：先算创新自己的协方差 \texorpdfstring{$\bm{S}_t$}{S_t}}
 
 \proofstep{enter}{定义创新协方差：}
 
@@ -131,7 +122,7 @@
 \(\bm{S}_t\)
 衡量的是“这一拍创新本身有多不确定”，而不是“状态有多不确定”。}
 
-\section{第三步：再算状态误差和创新的互协方差}
+\subsection{第三步：再算状态误差和创新的互协方差}
 
 \proofstep{enter}{我们关心的是}
 
@@ -165,7 +156,7 @@
 
 \proofstep{done}{这条式子在直觉上很重要：如果某个状态方向和创新根本不相关，那创新就没有理由去修它。}
 
-\section{第四步：直接把目标函数写出来，对 \texorpdfstring{$\bm{K}_t$}{K_t} 求最小值}
+\subsection{第四步：直接把目标函数写出来，对 \texorpdfstring{$\bm{K}_t$}{K_t} 求最小值}
 
 \proofstep{enter}{更新结构已经固定成}
 
@@ -346,7 +337,7 @@ J(\bm{K}_t)
 = \bm{P}_{t|t-1}\bm{H}^\top\bm{S}_t^{-1}.
 \]
 
-\section{一句话理解这条公式}
+\subsection{一句话理解这条公式}
 
 \[
 \bm{K}_t
@@ -367,7 +358,7 @@ K_t
 这次残差到底有多值得信，以及该把它分配到哪些状态方向上。
 \end{quote}
 
-\section{工程尾注：如果还要更新协方差}
+\subsection{工程尾注：如果还要更新协方差}
 
 \proofstep{have}{思想上，前面的推导已经够了。}
 
@@ -382,5 +373,3 @@ K_t
 \proofstep{done}{这叫 Joseph 形式。它的角色主要是工程稳健性，不是理解
 \(\bm{K}_t\)
 公式来龙去脉的主线。}
-
-\end{document}

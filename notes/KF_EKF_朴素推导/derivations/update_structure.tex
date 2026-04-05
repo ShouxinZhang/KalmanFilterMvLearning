@@ -1,15 +1,6 @@
-\documentclass[12pt,a4paper]{ctexart}
-\input{../preamble.tex}
+\section{为什么更新结构长成 \texorpdfstring{$\hat{\bm{x}}_{t|t}=\hat{\bm{x}}_{t|t-1}+\bm{K}_t\tilde{\bm{y}}_t$}{xhat = xhat + K ytilde}}\label{app:update-structure}
 
-\title{细节推导：为什么更新结构长成 \texorpdfstring{$\hat{\bm{x}}_{t|t}=\hat{\bm{x}}_{t|t-1}+\bm{K}_t\tilde{\bm{y}}_t$}{xhat = xhat + K ytilde}}
-\author{}
-\date{\today}
-
-\begin{document}
-
-\maketitle
-
-\section{目标}
+\subsection{目标}
 
 我们想解释的不是一个“背下来的公式”，而是下面这条更新结构为什么几乎是被问题本身逼出来的：
 
@@ -20,7 +11,7 @@
 \tilde{\bm{y}}_t = \bm{y}_t - \hat{\bm{y}}_{t|t-1}.
 \]
 
-\section{先明确我们手里到底有什么}
+\subsection{先明确我们手里到底有什么}
 
 在更新这一步开始时，手里已经有两样东西：
 
@@ -36,7 +27,7 @@
 \hat{\bm{x}}_{t|t} = \Phi(\hat{\bm{x}}_{t|t-1}, \bm{y}_t).
 \]
 
-\section{为什么要先把观测变成创新}
+\subsection{为什么要先把观测变成创新}
 
 \proofstep{rw}{观测值
 \(\bm{y}_t\)
@@ -77,7 +68,7 @@
 \hat{\bm{x}}_{t|t} = \Psi(\hat{\bm{x}}_{t|t-1}, \tilde{\bm{y}}_t).
 \]
 
-\section{为什么修正项要依赖创新}
+\subsection{为什么修正项要依赖创新}
 
 \proofstep{rw}{如果观测和预测完全一致，也就是
 \(\tilde{\bm{y}}_t=\bm{0}\)，
@@ -102,7 +93,7 @@
 g(\bm{0})=\bm{0}.
 \]
 
-\section{为什么又进一步写成线性形式}
+\subsection{为什么又进一步写成线性形式}
 
 \proofstep{rw}{到这里为止，我们已经知道更新律可以看成“创新进去，更新后估计出来”的函数。由于在时刻
 \(t\)，
@@ -156,7 +147,7 @@ g(\bm{0})=\bm{0}.
 
 \proofstep{done}{这个视角和 EKF 很一致：都是先承认“真实更新律可能更一般”，再抓它在当前点附近最重要的一阶线性部分。区别只在于 KF 最后还能进一步证明：最优更新本来就落在线性族里。}
 
-\section{\texorpdfstring{$\bm{K}_t$}{K_t} 到底是什么}
+\subsection{\texorpdfstring{$\bm{K}_t$}{K_t} 到底是什么}
 
 \proofstep{have}{先看维度。若状态是
 \(\bm{x}_t \in \mathbb{R}^n\)，
@@ -183,7 +174,7 @@ g(\bm{0})=\bm{0}.
 \(\bm{K}_t\) 的每一列，都表示“某一维观测残差应该如何分摊到各个状态维度上”。
 \end{quote}
 
-\section{放到小车例子里看}
+\subsection{放到小车例子里看}
 
 在主文档的小车例子里，
 \[
@@ -221,7 +212,7 @@ k_v
 \(\bm{K}_t\)
 最值得记住的含义：虽然传感器只直接看到了位置，但同一个位置残差，仍然可以顺带修正速度。}
 
-\section{再往前走一步：为什么不是别的复杂函数}
+\subsection{再往前走一步：为什么不是别的复杂函数}
 
 当然，你也可以幻想更新式写成更复杂的样子，比如：
 \[
@@ -248,5 +239,3 @@ k_v
 
 下一步真正要解决的问题，才是怎么选出最优的
 \(\bm{K}_t\)。
-
-\end{document}

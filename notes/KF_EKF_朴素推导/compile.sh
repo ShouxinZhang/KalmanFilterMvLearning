@@ -32,27 +32,7 @@ compile_tex() {
   rm -f "${out_dir}/${job_name}.pdf"
 }
 
-mkdir -p "${pdf_dir}/derivations" "${build_dir}/main" "${build_dir}/derivations"
+mkdir -p "${pdf_dir}" "${build_dir}/main"
+rm -rf "${pdf_dir}/derivations" "${build_dir}/derivations"
 
-# 并行编译所有 tex 文件（main + derivations）
-pids=()
-
-compile_tex "main.tex" "${build_dir}/main" "${pdf_dir}/main.pdf" "${note_dir}" &
-pids+=($!)
-
-for src_file in derivations/*.tex; do
-  job_name="$(basename "${src_file%.tex}")"
-  mkdir -p "${build_dir}/derivations/${job_name}"
-  compile_tex "${job_name}.tex" "${build_dir}/derivations/${job_name}" "${pdf_dir}/derivations/${job_name}.pdf" "${note_dir}/derivations" &
-  pids+=($!)
-done
-
-# 等待全部完成，任一失败则报错退出
-failed=0
-for pid in "${pids[@]}"; do
-  wait "$pid" || failed=1
-done
-if [[ "$failed" -ne 0 ]]; then
-  echo "ERROR: one or more compilations failed" >&2
-  exit 1
-fi
+compile_tex "main.tex" "${build_dir}/main" "${pdf_dir}/main.pdf" "${note_dir}"

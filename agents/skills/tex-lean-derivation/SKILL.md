@@ -2,7 +2,6 @@
 name: tex-lean-derivation
 description: 在 TeX 文档里把数学推导写成 Lean4 风格的逐步改写。适用于用户希望把长串连等式改成“文字说明 + 改写后的公式 + 高亮本次变化块”的场景。
 ---
-
 # TeX Lean Derivation
 
 用于把数学推导改写成更易读的逐步重写风格。
@@ -70,10 +69,8 @@ description: 在 TeX 文档里把数学推导写成 Lean4 风格的逐步改写�
 
 - 优先把“主线叙述”和“细节推导”分开。
 - 主文档 `main` 只保留主结论、主流程、必要的短公式和跳转入口。
-- 细节推导尽量拆成独立子块；一个重要推导对应一个独立 section，必要时独立成一个子 PDF。
+- 细节推导尽量拆成独立子块；一个重要推导对应一个独立 section。
 - 导言区不要在每个文件里重复写；优先抽成共享 `preamble.tex`、`.sty` 或同等公共头文件。
-- 如果做多 PDF 结构，主文档负责链接到子 PDF；子 PDF 专注于单个推导，不混入太多主线叙述。
-- 如果做单 PDF 结构，细节推导至少也应独立分页，避免和主线正文搅在一起。
 
 需要多文件布局时，读 [references/modular-pdf-layout.md](references/modular-pdf-layout.md)。
 

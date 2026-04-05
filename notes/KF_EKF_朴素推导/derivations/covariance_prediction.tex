@@ -1,15 +1,6 @@
-\documentclass[12pt,a4paper]{ctexart}
-\input{../preamble.tex}
+\section{误差协方差怎么预测}\label{app:covariance-prediction}
 
-\title{细节推导：误差协方差怎么预测}
-\author{}
-\date{\today}
-
-\begin{document}
-
-\maketitle
-
-\section{目标}
+\subsection{目标}
 
 我们要证明：
 \[
@@ -25,7 +16,7 @@
 \bm{e}_{t|t-1} = \bm{x}_t - \hat{\bm{x}}_{t|t-1}.
 \]
 
-\section{先把误差递推式写出来}
+\subsection{先把误差递推式写出来}
 
 \proofstep{enter}{从状态方程和预测均值公式出发：}
 
@@ -43,7 +34,7 @@
 = \bm{F}\bm{e}_{t-1|t-1} + \bm{w}_t.
 \]
 
-\section{把它代回协方差定义}
+\subsection{把它代回协方差定义}
 
 \proofstep{enter}{代入
 \(\bm{P}_{t|t-1} = \mathbb{E}[\bm{e}_{t|t-1}\bm{e}_{t|t-1}^\top]\)。}
@@ -70,7 +61,7 @@
 \end{aligned}
 \]
 
-\section{逐项处理}
+\subsection{逐项处理}
 
 \proofstep{rw}{先看蓝色项。因为
 \(\bm{F}\)
@@ -140,7 +131,7 @@
 = \bm{0}.
 \]
 
-\section{合并结果}
+\subsection{合并结果}
 
 \proofstep{done}{把蓝色、青色、橙色三部分放回去：}
 
@@ -158,5 +149,3 @@
   \item 新的一拍里，模型本身还会额外引入过程噪声
   \(\bm{Q}\)。
 \end{enumerate}
-
-\end{document}
