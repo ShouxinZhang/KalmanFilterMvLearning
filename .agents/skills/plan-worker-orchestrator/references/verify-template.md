@@ -10,14 +10,16 @@ Acceptance rule: all items below must pass before completion. If any item fails,
 - [ ] <required file 1> exists.
 - [ ] <required file 2> exists.
 - [ ] <new artifact or benchmark> exists and is runnable.
-- [ ] `log4human.md` exists.
+- [ ] `log4human/` directory exists.
+- [ ] Each worker has written `log4human/log4human_<worker_task>.md`.
+- [ ] `log4human/log4human.md` summary exists (written by secretary subagent).
 
 ## Content gate
 
 - [ ] The new text makes the intended claim explicitly.
 - [ ] The text does not overclaim or contradict existing material.
 - [ ] Parallel outputs make the same scientific or technical claim at a high level.
-- [ ] `log4human.md` clearly states task, completed work, key result, and artifact locations without unnecessary detail.
+- [ ] `log4human/log4human.md` clearly states task, completed work, key result, and artifact locations without unnecessary detail.
 
 ## Runtime gate
 

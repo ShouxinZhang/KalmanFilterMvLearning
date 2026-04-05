@@ -302,19 +302,102 @@ h_5 = 0.40(-0.76) + 0.60(0.20) = -0.184.
 
 GRU 则通常是更实用的选择，尤其当任务需要跨越多步保留上下文时更是如此。代价是结构更复杂、参数更多。更准确的理解方式不是“GRU 推翻了 RNN”，而是“GRU 修补了 RNN 最主要的一类工程弱点”。
 
-\section{这些模型如何训练}
+\section{神经网络架构本身是怎样学出来的}
 
-二者在训练外层流程上几乎相同：
+\subsection{从 token 到预测：一条完整管线}
+
+理解这件事时，最好把\emph{架构}和\emph{优化器}分开。优化器也许是 Adam，也许是普通梯度下降，但它优化的对象始终是一条具体的神经网络管线：
 
 \begin{enumerate}
-  \item 收集序列与目标标签的数据集；
-  \item 让模型沿序列正向运行；
-  \item 根据预测误差计算损失；
-  \item 沿展开后的时间步骤反向传播梯度；
-  \item 用梯度下降或其变体更新参数。
+  \item 先把 token 或输入值映射成向量表示；
+  \item 再让递归核心把这个新向量与旧隐藏状态结合起来；
+  \item 再由读出层把最终隐藏状态变成任务输出；
+  \item 最后把预测误差变成梯度，沿整条链路反传回去。
 \end{enumerate}
 
-主要差别在于：GRU 往往更容易把有用梯度跨较长时间跨度传递下去，因为门控为“记忆保留”提供了更稳定的路径。
+因此，模型学到的并不是一个笼统的“黑箱能力”，而是几类参数一起协调出来的结果。嵌入层学习怎样表示词；递归核心学习怎样更新记忆；读出层学习怎样把隐藏状态解释成最终预测。
+
+\subsection{各类参数到底在学什么}
+
+\paragraph{嵌入层。}
+嵌入矩阵学习的是：哪些 token 应该在向量空间里彼此接近，哪些应当被分开。在情感任务中，模型也许会学到 \texttt{good} 与 \texttt{great} 的方向比较接近；而 \texttt{not} 则更像一个修饰器，它不直接表达情感，却会改变后面词的作用方式。
+
+\paragraph{递归核心。}
+递归权重决定新输入和旧状态如何融合。在朴素 RNN 里，同一套更新机制必须同时完成许多任务：
+\begin{itemize}
+  \item 对新信息作出反应；
+  \item 保留有用旧信息；
+  \item 丢掉无关细节；
+  \item 还要让整个动力学保持数值稳定。
+\end{itemize}
+这正是朴素 RNN 容易难训的原因之一。
+
+而在 GRU 里，架构本身已经把这些职责拆得更开。更新门学习什么时候主要保留旧记忆；重置门学习什么时候在构造候选状态时应弱化旧状态。换句话说，GRU 不是凭空“更聪明”，而是它先给优化器提供了一个更有结构的参数化方式。
+
+\paragraph{读出层。}
+读出层学习的是如何把隐藏状态空间中的几何方向翻译成任务标签。对二分类情感任务而言，可以把它理解成：读出层在隐藏状态空间里学出一条“更正面”与“更负面”的方向。隐藏状态本身不一定天然可解释，只要经过读出后能服务预测即可。
+
+\subsection{时间反向传播到底在改什么}
+
+\emph{时间反向传播}
+这个词常常听起来很抽象，所以不妨用句子
+\[
+\texttt{``movie is not good''}
+\]
+来把它拆开。
+
+假设模型错误地把这句话判成了正面。
+
+\paragraph{enter：先定位错误。}
+最终输出之所以错，是因为最后的隐藏状态被读出层解释得过于正面。
+
+\paragraph{rw：先把误差送回读出层。}
+读出层权重会收到梯度，告诉它当前这个最终状态不该再如此强地支持正类。
+
+\paragraph{rw：再把误差送回递归核心。}
+递归参数会收到另一个信号：\texttt{not} 的影响没有被足够稳定地保留到最后，因此后面的 \texttt{good} 才会被解释得过于字面。
+
+\paragraph{rw：继续送回嵌入层。}
+\texttt{not} 这个 token 的嵌入也会收到学习信号。模型实际上被告知：
+\begin{quote}
+这个词应当把隐藏状态推向一个能持续更久、足以改变后续词语解释的方向。
+\end{quote}
+
+\paragraph{done：所有参数组一起更新。}
+一次优化步之后，模型并不是简单地“背下一个标签”，而是同时微调了：
+\begin{itemize}
+  \item \texttt{not} 的向量表示；
+  \item 记忆如何向后传递的递归规则；
+  \item 最终隐藏状态如何被解释的读出规则。
+\end{itemize}
+
+这就是为什么架构重要。不同的参数化方式，会决定同一个误差信号究竟能沿哪些路径传播。
+
+\subsection{为什么 GRU 往往更容易学}
+
+GRU 的优势并不来自什么神秘力量。更准确的说法是：它往往更容易训练，因为它给优化器提供了一个更友好的搜索空间。
+
+在朴素 RNN 里，一条递归映射必须同时决定：
+\begin{itemize}
+  \item 写入多少新信息；
+  \item 保留多少旧信息；
+  \item 梯度应当如何跨时间存活。
+\end{itemize}
+
+在 GRU 里，这些职责被拆得更清楚。这样并不保证它在每个小任务上都赢，但它确实减少了“优化器和架构彼此对抗”的情况。因此，只要任务真的开始依赖长记忆，GRU 往往更容易被训练到正确的工作状态。
+
+\subsection{这和配套代码为什么能对应起来}
+
+从这个角度看，easy toy demo 和 harder benchmark 的差异也就更容易理解了。
+
+在 easy sentiment demo 里，架构不需要学会非常精细的记忆策略。句子短、模式简单，因此 plain RNN 和 GRU 都可能找到够用的参数组合。
+
+但在 long-memory benchmark 里，架构必须学会更苛刻的行为：
+\begin{quote}
+尽早写入一位信息，把它穿过很多干扰步骤保护住，再在最后把它读出来。
+\end{quote}
+
+这正是 GRU 架构内部职责分离开始真正发挥价值的地方。因此，这个 benchmark 讲的不只是精度差异，也是在讲：哪一种神经网络架构更容易被训练成所需的记忆行为。
 
 \section{关于配套代码的一点说明}
 
@@ -342,6 +425,166 @@ GRU & 仅 \(12\) & 约 \(1.000\) \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\subsection{一个真正可以证明的版本}
+
+句子
+\emph{“GRU 收敛，而朴素 RNN 不收敛”}
+本身太强，不能直接当成定理来用。一般地说，两类模型都可能成功，也都可能失败，这取决于参数、初始化、优化过程以及任务本身。
+
+对于上面的 long-memory benchmark，更可辩护的严格说法其实是下面这对命题：
+\begin{enumerate}
+  \item 一类\emph{收缩型}朴素 RNN 会指数遗忘早期信息；
+  \item GRU 存在一组参数，使得在任意固定时域内，记忆误差都可以做得任意小。
+\end{enumerate}
+
+\paragraph{命题 1（收缩型朴素 RNN 指数遗忘）。}
+考虑标量递推
+\[
+h_t = \tanh(\alpha x_t + \beta h_{t-1}),
+\qquad |\beta| \le \rho < 1.
+\]
+取两条序列，它们从时间 \(2\) 开始完全相同，只在时间 \(1\) 写入了不同的 bit。对应隐藏状态分别记为 \(h_t^+\) 与 \(h_t^-\)。则有
+\[
+|h_T^+ - h_T^-|
+\le
+\rho^{T-1}|h_1^+ - h_1^-|.
+\]
+
+\paragraph{按小步证明。}
+\textbf{enter：} 先定义差值
+\[
+\Delta_t := h_t^+ - h_t^-.
+\]
+
+\textbf{rw：} 因为两条序列在 \(t \ge 2\) 时使用的是同一个输入 \(x_t\)，所以
+\[
+\Delta_t
+=
+\tanh(\alpha x_t + \beta h_{t-1}^+)
+-
+\tanh(\alpha x_t + \beta h_{t-1}^-).
+\]
+
+\textbf{have：} 函数 \(\tanh\) 是 \(1\)-Lipschitz 的，因此
+\[
+|\tanh(u)-\tanh(v)| \le |u-v|.
+\]
+在这里代入
+\[
+u=\alpha x_t + \beta h_{t-1}^+,
+\qquad
+v=\alpha x_t + \beta h_{t-1}^-,
+\]
+便得到
+\[
+|\Delta_t|
+\le
+|\beta|\,|h_{t-1}^+ - h_{t-1}^-|
+=
+|\beta|\,|\Delta_{t-1}|
+\le
+\rho |\Delta_{t-1}|.
+\]
+
+\textbf{done：} 从 \(t=2\) 一直迭代到 \(t=T\)，便有
+\[
+|\Delta_T|
+\le
+\rho^{T-1}|\Delta_1|.
+\]
+于是，两种不同早期 bit 所对应的分离边距会随着序列长度指数衰减。
+
+\paragraph{直观解释。}
+这\emph{并不是}在说所有朴素 RNN 都失败。它说的是：一旦递推映射本身是收缩的，那么早期信息就会被指数级压扁。这正是长程记忆和长度外推容易变脆弱的核心机制。
+
+\paragraph{命题 2（GRU 可实现任意精度的有限时域记忆）。}
+考虑标量 GRU 状态
+\[
+h_t = (1-z_t)h_{t-1} + z_t \tilde h_t,
+\qquad 0 \le z_t \le 1.
+\]
+固定时域 \(T\) 与目标精度 \(\delta > 0\)。设要保存的 bit 对应目标值 \(s \in [-m,m]\)。若参数被选到满足
+\[
+|h_1-s| \le 2m\varepsilon,
+\qquad
+z_t \le \varepsilon \ \text{对所有 } 2 \le t \le T,
+\qquad
+|\tilde h_t| \le m \ \text{对所有 } 2 \le t \le T,
+\]
+那么对任意 \(1 \le t \le T\)，都有
+\[
+|h_t-s| \le 2mt\varepsilon.
+\]
+因此，只要取
+\[
+\varepsilon \le \frac{\delta}{2mT},
+\]
+就能保证
+\[
+|h_t-s| \le \delta
+\qquad
+\text{对所有 } 1 \le t \le T.
+\]
+
+\paragraph{按小步证明。}
+\textbf{enter：} 定义记忆误差
+\[
+e_t := |h_t-s|.
+\]
+
+\textbf{rw：} 将 GRU 更新式代入：
+\[
+e_t
+=
+\left|(1-z_t)h_{t-1} + z_t \tilde h_t - s\right|.
+\]
+在右边加减 \((1-z_t)s\)，可改写成
+\[
+e_t
+=
+\left|(1-z_t)(h_{t-1}-s) + z_t(\tilde h_t-s)\right|.
+\]
+
+\textbf{have：} 用三角不等式：
+\[
+e_t
+\le
+(1-z_t)|h_{t-1}-s| + z_t|\tilde h_t-s|
+=
+(1-z_t)e_{t-1} + z_t|\tilde h_t-s|.
+\]
+
+\textbf{rw：} 因为 \(|\tilde h_t| \le m\) 且 \(|s| \le m\)，所以
+\[
+|\tilde h_t-s| \le |\tilde h_t| + |s| \le 2m.
+\]
+再结合 \(z_t \le \varepsilon\)，得到
+\[
+e_t \le e_{t-1} + 2m\varepsilon.
+\]
+
+\textbf{done：} 从 \(e_1 \le 2m\varepsilon\) 出发迭代：
+\[
+e_t
+\le
+e_1 + 2m(t-1)\varepsilon
+\le
+2mt\varepsilon.
+\]
+于是只要令 \(\varepsilon \le \delta/(2mT)\)，便可保证整个时域内 \(e_t \le \delta\)。
+
+\paragraph{为什么这和 benchmark 对得上。}
+这个 benchmark 的 token 类型是有限个，所以 GRU gate 只需要在有限种输入情形下“表现正确”即可。对于有限集合，sigmoid 的 logit 完全可以在干扰 token 上做得非常负，在写入 token 上做得非常正。因此，上面的假设 \(z_t \le \varepsilon\) 并不是空想；它正是 GRU 在这类任务里能够学出来的门控模式。
+
+\paragraph{真正应记住的结论。}
+因此，严格说法不应是
+\emph{“GRU 收敛，而 RNN 不收敛。”}
+更准确的说法是：
+\begin{quote}
+对这类 long-memory 任务，一类收缩型朴素 RNN 会指数遗忘早期信息，而 GRU 则允许在任意固定时域上实现近似恒等的记忆传递。
+\end{quote}
+这个结论在数学上是站得住的，也更贴近 benchmark 真正展示的内容。
 
 \section{放到统一状态空间视角里看}
 

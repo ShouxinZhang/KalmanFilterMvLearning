@@ -22,7 +22,8 @@ Task scope: <one-paragraph scope statement>
 - [ ] Reconcile naming, assumptions, and claims across outputs.
 - [ ] Run the required commands and capture observed behavior.
 - [ ] Rebuild artifacts if needed.
-- [ ] Write `log4human.md` for a human reader who only wants task / result / artifact locations.
+- [ ] Each worker writes its own `log4human/log4human_<worker_task>.md` upon completion.
+- [ ] Spawn secretary subagent to read all worker logs and write `log4human/log4human.md`.
 - [ ] Execute every item in `verify.md`. Do not mark completion until the acceptance gate passes.
 ```
 

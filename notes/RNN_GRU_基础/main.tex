@@ -303,19 +303,104 @@ The plain RNN remains valuable because it is the cleanest recurrent idea. It is 
 
 The GRU is usually the more practical choice when one wants a recurrent model and expects dependencies that are not purely local. The price is extra machinery and more parameters. One should therefore not think of the GRU as replacing the RNN conceptually. Rather, it is a repair to one of the RNN's main engineering weaknesses.
 
-\section{How These Models Are Trained}
+\section{How the Neural Architecture Actually Learns}
 
-For both models, training follows the same outer loop:
+\subsection{From Token to Prediction}
+
+It is useful to separate \emph{the architecture} from \emph{the optimizer}. The optimizer may be Adam or gradient descent, but what it is optimizing is a concrete pipeline:
 
 \begin{enumerate}
-  \item collect a dataset of sequences and targets,
-  \item run the model forward through each sequence,
-  \item compute a loss from the prediction error,
-  \item propagate gradients backward through the unrolled time steps,
-  \item update parameters by gradient descent or one of its variants.
+  \item a token or input value is converted into a vector representation,
+  \item the recurrent core mixes that new vector with the previous hidden state,
+  \item the final hidden state is mapped to a task output by a readout layer,
+  \item the loss compares that output with the target and sends gradients back through the whole chain.
 \end{enumerate}
 
-The difference is that the GRU usually passes useful gradients across longer spans more reliably, because its gates create better routes for memory preservation.
+For a text example, the architecture is not learning one mysterious object. It is learning several coordinated maps. The embedding layer learns how words should be represented as vectors. The recurrent core learns how new evidence should change memory. The readout layer learns which directions in hidden-state space matter for the final decision.
+
+\subsection{What Each Parameter Group Learns}
+
+\paragraph{Embedding layer.}
+The embedding matrix learns which tokens should start near one another and which should be separated. In a sentiment task, the model may learn that \texttt{good} and \texttt{great} should point in related directions, while \texttt{not} should behave less like a sentiment word and more like a modifier that changes how later words are interpreted.
+
+\paragraph{Recurrent core.}
+The recurrent weights determine how past state and current input are fused. In a plain RNN, the same update mechanism must do many jobs at once:
+\begin{itemize}
+  \item react to new information,
+  \item preserve useful old information,
+  \item forget irrelevant detail,
+  \item and keep the dynamics numerically stable.
+\end{itemize}
+This is one reason the plain RNN can be hard to optimize.
+
+In a GRU, the architecture gives the optimizer a more structured parameterization. The update gate learns when the old memory should mostly stay. The reset gate learns when the old memory should matter less while forming a candidate state. In other words, the architecture already separates several roles that the plain RNN tries to handle with one undifferentiated recurrence.
+
+\paragraph{Readout layer.}
+The readout layer learns how to turn hidden-state geometry into a task prediction. For binary sentiment classification, one may think of the readout as learning a direction in hidden-state space that means
+\emph{``more positive''}
+versus
+\emph{``more negative.''}
+The hidden state need not look interpretable by itself; it only needs to become useful after the readout is applied.
+
+\subsection{What Backpropagation Through Time Is Actually Changing}
+
+The phrase \emph{backpropagation through time} can sound abstract, so let us unpack it using the sentence
+\[
+\texttt{``movie is not good''}.
+\]
+
+Suppose the model incorrectly predicts that the sentence is positive.
+
+\paragraph{enter: locate the error.}
+The output is wrong because the final hidden state was interpreted by the readout layer as too positive.
+
+\paragraph{rw: send the error backward through the readout.}
+The readout weights receive a gradient telling them that the final state should contribute less to the positive class.
+
+\paragraph{rw: continue backward into the recurrent core.}
+The recurrent parameters receive a gradient telling them that the effect of \texttt{not} was not preserved strongly enough until the final word \texttt{good} arrived.
+
+\paragraph{rw: continue backward into the embedding layer.}
+The embedding of \texttt{not} also receives a learning signal. The model is effectively told:
+\begin{quote}
+this token should push the hidden state in a direction that survives long enough to change the later interpretation of \texttt{good}.
+\end{quote}
+
+\paragraph{done: update all parameter groups together.}
+After one optimizer step, the network has not merely \emph{memorized a label}. It has slightly changed:
+\begin{itemize}
+  \item the vector used for \texttt{not},
+  \item the recurrent rule that transports memory forward,
+  \item and the readout rule that interprets the final state.
+\end{itemize}
+
+This is why architecture matters. Different parameterizations create different routes along which the same error signal can travel.
+
+\subsection{Why GRU Is Usually Easier to Learn}
+
+The GRU is not powerful because of magic. It is often easier to train because its architecture gives the optimizer a better search space.
+
+In a plain RNN, one recurrent map must simultaneously decide
+\begin{itemize}
+  \item how much new information to write,
+  \item how much old information to keep,
+  \item and how strongly gradients should survive over time.
+\end{itemize}
+
+In a GRU, these responsibilities are separated more cleanly. That does not guarantee better results on every small task. But it does mean that when the task truly requires long memory, the optimizer is less likely to fight against the architecture itself.
+
+\subsection{How This Connects to the Companion Code}
+
+This perspective also explains why the easy toy demo and the harder benchmark behave differently.
+
+In the easy sentiment demo, the architecture does not need to learn a very delicate memory strategy. Short sequences and simple negation are often easy enough that both a plain RNN and a GRU can learn workable parameter settings.
+
+In the long-memory benchmark, the architecture must learn something stricter:
+\begin{quote}
+write one bit early, protect it through many distractor steps, and still expose it at the end.
+\end{quote}
+
+That is precisely the sort of task where the architectural separation inside the GRU becomes more valuable. So the benchmark is not only a story about accuracy; it is also a story about which neural architecture is easier to tune into the required behavior.
 
 \section{A Note on the Companion Code}
 
@@ -344,6 +429,166 @@ GRU & \(12\) only & about \(1.000\) \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\subsection{A Precise Statement One Can Actually Prove}
+
+The sentence
+\emph{``GRU converges whereas plain RNN does not converge''}
+is too strong to use as a theorem. In general, both model families may succeed or fail depending on parameters, initialization, optimization, and task design.
+
+For the long-memory benchmark above, a mathematically defensible pair of statements is weaker and more precise:
+\begin{enumerate}
+  \item a \emph{contractive} plain RNN forgets early information exponentially fast,
+  \item a GRU admits parameter settings whose memory error can be made arbitrarily small on any fixed horizon.
+\end{enumerate}
+
+\paragraph{Proposition 1 (contractive plain RNN forgets exponentially).}
+Consider the scalar recurrence
+\[
+h_t = \tanh(\alpha x_t + \beta h_{t-1}),
+\qquad |\beta| \le \rho < 1.
+\]
+Take two sequences that are identical from time \(2\) onward and differ only in the stored bit at time \(1\). Let the corresponding hidden states be \(h_t^+\) and \(h_t^-\). Then
+\[
+|h_T^+ - h_T^-|
+\le
+\rho^{T-1}|h_1^+ - h_1^-|.
+\]
+
+\paragraph{Proof in small steps.}
+\textbf{enter:} define the difference
+\[
+\Delta_t := h_t^+ - h_t^-.
+\]
+
+\textbf{rw:} because the two sequences share the same suffix, for every \(t \ge 2\) they use the same input \(x_t\). Hence
+\[
+\Delta_t
+=
+\tanh(\alpha x_t + \beta h_{t-1}^+)
+-
+\tanh(\alpha x_t + \beta h_{t-1}^-).
+\]
+
+\textbf{have:} the function \(\tanh\) is \(1\)-Lipschitz, so
+\[
+|\tanh(u)-\tanh(v)| \le |u-v|.
+\]
+Apply this with
+\[
+u=\alpha x_t + \beta h_{t-1}^+,
+\qquad
+v=\alpha x_t + \beta h_{t-1}^-.
+\]
+Then
+\[
+|\Delta_t|
+\le
+|\beta|\,|h_{t-1}^+ - h_{t-1}^-|
+=
+|\beta|\,|\Delta_{t-1}|
+\le
+\rho |\Delta_{t-1}|.
+\]
+
+\textbf{done:} iterate the same inequality from \(t=2\) to \(t=T\):
+\[
+|\Delta_T|
+\le
+\rho^{T-1}|\Delta_1|.
+\]
+So the separation margin between two different stored bits decays exponentially with sequence length.
+
+\paragraph{Interpretation.}
+This does \emph{not} prove that every plain RNN fails. It proves that once the recurrent map is contractive, early information is squeezed away exponentially fast. That is exactly the kind of mechanism that makes long length generalization fragile.
+
+\paragraph{Proposition 2 (GRU admits arbitrarily accurate finite-horizon memory).}
+Consider a scalar GRU state
+\[
+h_t = (1-z_t)h_{t-1} + z_t \tilde h_t,
+\qquad 0 \le z_t \le 1.
+\]
+Fix a horizon \(T\) and a target tolerance \(\delta > 0\). Suppose the stored bit is a target value \(s \in [-m,m]\). If the parameters are chosen so that
+\[
+|h_1-s| \le 2m\varepsilon,
+\qquad
+z_t \le \varepsilon \ \text{for } 2 \le t \le T,
+\qquad
+|\tilde h_t| \le m \ \text{for } 2 \le t \le T,
+\]
+then for all \(1 \le t \le T\),
+\[
+|h_t-s| \le 2mt\varepsilon.
+\]
+Hence choosing
+\[
+\varepsilon \le \frac{\delta}{2mT}
+\]
+guarantees
+\[
+|h_t-s| \le \delta
+\qquad
+\text{for all } 1 \le t \le T.
+\]
+
+\paragraph{Proof in small steps.}
+\textbf{enter:} define the memory error
+\[
+e_t := |h_t-s|.
+\]
+
+\textbf{rw:} substitute the GRU update:
+\[
+e_t
+=
+\left|(1-z_t)h_{t-1} + z_t \tilde h_t - s\right|.
+\]
+Rewrite the right-hand side by adding and subtracting \((1-z_t)s\):
+\[
+e_t
+=
+\left|(1-z_t)(h_{t-1}-s) + z_t(\tilde h_t-s)\right|.
+\]
+
+\textbf{have:} apply the triangle inequality:
+\[
+e_t
+\le
+(1-z_t)|h_{t-1}-s| + z_t|\tilde h_t-s|
+=
+(1-z_t)e_{t-1} + z_t|\tilde h_t-s|.
+\]
+
+\textbf{rw:} because \(|\tilde h_t| \le m\) and \(|s| \le m\),
+\[
+|\tilde h_t-s| \le |\tilde h_t| + |s| \le 2m.
+\]
+Since \(z_t \le \varepsilon\), we get
+\[
+e_t \le e_{t-1} + 2m\varepsilon.
+\]
+
+\textbf{done:} start from \(e_1 \le 2m\varepsilon\), then iterate:
+\[
+e_t
+\le
+e_1 + 2m(t-1)\varepsilon
+\le
+2mt\varepsilon.
+\]
+Therefore choosing \(\varepsilon \le \delta/(2mT)\) yields \(e_t \le \delta\) for the whole horizon.
+
+\paragraph{Why this matches the benchmark.}
+The benchmark uses a finite alphabet of token types, so the GRU gates only need to behave correctly on finitely many input cases. On a finite set, sigmoid logits can be made arbitrarily negative on distractor tokens and strongly positive on write tokens. Therefore the hypothesis \(z_t \le \varepsilon\) on distractors is not a fantasy; it is exactly the kind of gate pattern the GRU can learn to approximate.
+
+\paragraph{Bottom line.}
+The rigorous conclusion is therefore not
+\emph{``GRU converges, RNN does not.''}
+The rigorous conclusion is:
+\begin{quote}
+for this kind of long-memory task, contractive plain RNNs forget early information exponentially fast, whereas GRUs admit near-identity memory transport over any fixed horizon.
+\end{quote}
+That claim is mathematically defensible, and it is much closer to what the benchmark is actually showing.
 
 \section{A Unified State-Space View}
 

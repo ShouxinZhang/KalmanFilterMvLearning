@@ -24,7 +24,7 @@ description: 先由记忆继承 subagent 产出 `plan.md` 和 `verify.md`，再�
 ## 默认目录
 
 - 任务缓存目录：`.agents/cache/<task-name>/`
-- 至少包含：
+- 最终至少包含：
   - `plan.md`
   - `verify.md`
   - `log4human.md`
@@ -42,6 +42,7 @@ description: 先由记忆继承 subagent 产出 `plan.md` 和 `verify.md`，再�
   - `verify.md`
 
 不要在 `plan.md` 和 `verify.md` 出来之前抢先派实现 worker。
+此时不要让 `plan agent` 预写 `log4human.md`。
 
 ### 2. `plan agent` 的要求
 
@@ -82,13 +83,14 @@ description: 先由记忆继承 subagent 产出 `plan.md` 和 `verify.md`，再�
   - 再跑哪条命令
   - 预期会看到什么现象
 
+但这个文件不属于 planner 阶段；它应在真实实现完成后，由 worker 或串行集成阶段产出。
+
 ### 2.1 Planner Isolation Contract
 
 `plan agent` 只允许修改缓存目录中的：
 
 - `plan.md`
 - `verify.md`
-- `log4human.md`
 
 除此之外的任何文件改动，都视为越权，不算成功完成计划阶段。
 
@@ -113,12 +115,14 @@ description: 先由记忆继承 subagent 产出 `plan.md` 和 `verify.md`，再�
 2. 明确声明“不要实现任务本体”
 3. 明确声明“越权修改 = 失败”
 4. 要求它在回报时列出修改文件，供主 agent 复核
+5. 明确声明“不要预写 `log4human.md`”
 
 如有命令占位符，例如 `<harder_demo_file>.py`，在主 agent 最终验收前要替换成真实路径。
 
 ## worker 派发规则
 
 - 先读 `plan.md`，再按其中的串并行设计派 worker。
+- `log4human.md` 默认分配给最后一个 worker 或 serial integration 阶段，而不是 planner。
 - 每个 worker 必须有清晰 ownership，写入范围不能重叠。
 - 如果任务可拆为多个互不冲突的文件面：
   - README / 文档说明
