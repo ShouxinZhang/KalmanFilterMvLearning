@@ -4,6 +4,9 @@
 \usepackage{hyperref}
 \usepackage{xcolor}
 \usepackage{microtype}
+\usepackage{tikz}
+
+\usetikzlibrary{arrows.meta, positioning, calc, fit, backgrounds}
 
 \hypersetup{
   colorlinks=true,
@@ -17,3 +20,76 @@
 \newcommand{\Cov}{\mathrm{Cov}}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\Normal}{\mathcal{N}}
+
+\tikzset{
+  rnndiagram/.style={
+    font=\small,
+    line cap=round,
+    line join=round,
+    >=Latex
+  },
+  rnninput/.style={
+    circle,
+    draw=blue!65!black,
+    fill=blue!8,
+    line width=0.5pt,
+    minimum size=8mm,
+    inner sep=0pt,
+    align=center
+  },
+  rnnstate/.style={
+    circle,
+    draw=black!70,
+    fill=white,
+    line width=0.5pt,
+    minimum size=9mm,
+    inner sep=0pt,
+    align=center
+  },
+  rnngate/.style={
+    circle,
+    draw=orange!80!black,
+    fill=orange!10,
+    line width=0.5pt,
+    minimum size=7mm,
+    inner sep=0pt,
+    align=center
+  },
+  rnnoutput/.style={
+    circle,
+    draw=green!55!black,
+    fill=green!8,
+    line width=0.5pt,
+    minimum size=8mm,
+    inner sep=0pt,
+    align=center
+  },
+  rnnblock/.style={
+    draw=black!18,
+    fill=black!3,
+    rounded corners=2pt,
+    align=center,
+    inner sep=6pt,
+    outer sep=1pt
+  },
+  rnnarrow/.style={
+    -Latex,
+    semithick
+  },
+  rnnrecur/.style={
+    -Latex,
+    semithick,
+    bend left=32
+  },
+  rnnskip/.style={
+    -Latex,
+    semithick,
+    dashed
+  }
+}
+
+\newcommand{\RNNInputNode}[3][]{\node[rnninput,#1] (#2) {#3};}
+\newcommand{\RNNStateNode}[3][]{\node[rnnstate,#1] (#2) {#3};}
+\newcommand{\RNNGateNode}[3][]{\node[rnngate,#1] (#2) {#3};}
+\newcommand{\RNNOutputNode}[3][]{\node[rnnoutput,#1] (#2) {#3};}
+\newcommand{\RNNBlockNode}[3][]{\node[rnnblock,#1] (#2) {#3};}

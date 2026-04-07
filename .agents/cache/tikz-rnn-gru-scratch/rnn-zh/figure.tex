@@ -1,3 +1,6 @@
+\documentclass[tikz,border=10pt]{standalone}
+\usepackage{ctex}
+% BEGIN_SHARED_PREAMBLE
 \usepackage[margin=2.2cm]{geometry}
 \usepackage{amsmath, amssymb, bm, mathtools}
 \usepackage{booktabs, array, longtable}
@@ -93,3 +96,22 @@
 \newcommand{\RNNGateNode}[3][]{\node[rnngate,#1] (#2) {#3};}
 \newcommand{\RNNOutputNode}[3][]{\node[rnnoutput,#1] (#2) {#3};}
 \newcommand{\RNNBlockNode}[3][]{\node[rnnblock,#1] (#2) {#3};}
+
+% END_SHARED_PREAMBLE
+
+\begin{document}
+\begin{tikzpicture}[rnndiagram, x=1cm, y=1cm]
+  \node[rnninput] (x) at (1.0,1.2) {\(x_t\)};
+  \node[rnnstate] (hprev) at (1.0,-1.2) {\(h_{t-1}\)};
+  \node[rnnblock, minimum width=3.7cm, minimum height=1.3cm] (cell) at (4.2,0) {\shortstack{RNN 单元\\\(\phi(W_x x_t + W_h h_{t-1} + b)\)}};
+  \node[rnnstate] (h) at (7.6,0) {\(h_t\)};
+  \node[rnnstate, dashed] (hnext) at (7.6,1.9) {\(h_{t+1}\)};
+  \node[rnnoutput] (y) at (7.6,-1.9) {\(\hat{y}_t\)};
+
+  \draw[rnnarrow] (x.east) -- (cell.north west);
+  \draw[rnnarrow] (hprev.east) -- (cell.south west);
+  \draw[rnnarrow] (cell.east) -- (h.west);
+  \draw[rnnarrow] (h.south) -- (y.north);
+  \draw[rnnskip] (h.north) -- node[right] {传到下一步} (hnext.south);
+\end{tikzpicture}
+\end{document}

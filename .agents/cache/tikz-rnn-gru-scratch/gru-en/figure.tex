@@ -1,3 +1,5 @@
+\documentclass[tikz,border=10pt]{standalone}
+% BEGIN_SHARED_PREAMBLE
 \usepackage[margin=2.2cm]{geometry}
 \usepackage{amsmath, amssymb, bm, mathtools}
 \usepackage{booktabs, array, longtable}
@@ -93,3 +95,36 @@
 \newcommand{\RNNGateNode}[3][]{\node[rnngate,#1] (#2) {#3};}
 \newcommand{\RNNOutputNode}[3][]{\node[rnnoutput,#1] (#2) {#3};}
 \newcommand{\RNNBlockNode}[3][]{\node[rnnblock,#1] (#2) {#3};}
+
+% END_SHARED_PREAMBLE
+
+\begin{document}
+\begin{tikzpicture}[rnndiagram, x=1cm, y=1cm]
+  \node[rnninput] (x) at (1.0,1.6) {$x_t$};
+  \node[rnnstate] (hprev) at (1.0,-1.6) {$h_{t-1}$};
+  \coordinate (join) at (2.2,0);
+
+  \node[rnngate] (z) at (3.3,1.0) {$z_t$};
+  \node[rnngate] (r) at (3.3,-0.6) {$r_t$};
+  \node[rnnblock, minimum width=2.9cm, minimum height=1.1cm] (cand) at (6.1,0) {\shortstack{candidate\\$\tilde{h}_t$}};
+  \node[rnnblock, minimum width=2.2cm, minimum height=1.1cm] (mix) at (9.0,0) {blend};
+  \node[rnnstate] (h) at (11.4,0) {$h_t$};
+  \node[rnnoutput] (y) at (11.4,-1.9) {$\hat{y}_t$};
+
+  \begin{scope}[on background layer]
+    \node[rnnblock, fit=(z)(r)(cand)(mix), inner sep=9pt] {};
+  \end{scope}
+
+  \draw[rnnarrow] (x.east) -- (join);
+  \draw[rnnarrow] (hprev.east) -- (join);
+  \draw[rnnarrow] (join) -- (z.west);
+  \draw[rnnarrow] (join) -- (r.west);
+  \draw[rnnarrow] (join) -- (cand.west);
+  \draw[rnnarrow] (r.east) -- (cand.west);
+  \draw[rnnarrow] (cand.east) -- node[above] {write} (mix.west);
+  \draw[rnnarrow] (z.east) |- (mix.north);
+  \draw[rnnskip] (hprev.east) .. controls +(1.8,0) and +(-1.8,-0.8) .. node[below] {keep} (mix.south);
+  \draw[rnnarrow] (mix.east) -- (h.west);
+  \draw[rnnarrow] (h.south) -- (y.north);
+\end{tikzpicture}
+\end{document}

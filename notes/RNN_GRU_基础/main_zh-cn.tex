@@ -101,6 +101,28 @@ h_t = \phi(W_x x_t + W_h h_{t-1} + b),
 
 输出的 \(h_t\)，就是对前缀 \((x_1,\dots,x_t)\) 的新摘要。
 
+把它画成结构图，会更容易看出信息流向。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[rnndiagram, x=1cm, y=1cm]
+  \node[rnninput] (x) at (1.0,1.2) {\(x_t\)};
+  \node[rnnstate] (hprev) at (1.0,-1.2) {\(h_{t-1}\)};
+  \node[rnnblock, minimum width=3.7cm, minimum height=1.3cm] (cell) at (4.2,0) {\shortstack{RNN 单元\\\(\phi(W_x x_t + W_h h_{t-1} + b)\)}};
+  \node[rnnstate] (h) at (7.6,0) {\(h_t\)};
+  \node[rnnstate, dashed] (hnext) at (7.6,1.9) {\(h_{t+1}\)};
+  \node[rnnoutput] (y) at (7.6,-1.9) {\(\hat{y}_t\)};
+
+  \draw[rnnarrow] (x.east) -- (cell.north west);
+  \draw[rnnarrow] (hprev.east) -- (cell.south west);
+  \draw[rnnarrow] (cell.east) -- (h.west);
+  \draw[rnnarrow] (h.south) -- (y.north);
+  \draw[rnnskip] (h.north) -- node[right] {传到下一步} (hnext.south);
+\end{tikzpicture}
+\caption{朴素 RNN 的一次更新：当前输入和旧状态先合成新的隐藏状态，再可选地产生输出。}
+\label{fig:rnn-zh}
+\end{figure}
+
 \subsection{一个朴素数值例子}
 
 设隐藏状态是一维的，并取
@@ -222,6 +244,42 @@ h_t = (1-z_t)\odot h_{t-1} + z_t \odot \tilde{h}_t.
   \item 更新门决定旧记忆应保留多少、新记忆应写入多少；
   \item 重置门决定在构造候选记忆时，要参考多少旧状态。
 \end{itemize}
+
+把门控结构画出来，可以把这两个作用分开看。
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[rnndiagram, x=1cm, y=1cm]
+  \node[rnninput] (x) at (1.0,1.6) {\(x_t\)};
+  \node[rnnstate] (hprev) at (1.0,-1.6) {\(h_{t-1}\)};
+  \coordinate (join) at (2.2,0);
+
+  \node[rnngate] (z) at (3.3,1.0) {\(z_t\)};
+  \node[rnngate] (r) at (3.3,-0.6) {\(r_t\)};
+  \node[rnnblock, minimum width=2.8cm, minimum height=1.1cm] (cand) at (6.1,0) {\shortstack{候选状态\\\(\tilde{h}_t\)}};
+  \node[rnnblock, minimum width=2.3cm, minimum height=1.1cm] (mix) at (9.0,0) {门控混合};
+  \node[rnnstate] (h) at (11.4,0) {\(h_t\)};
+  \node[rnnoutput] (y) at (11.4,-1.9) {\(\hat{y}_t\)};
+
+  \begin{scope}[on background layer]
+    \node[rnnblock, fit=(z)(r)(cand)(mix), inner sep=9pt] {};
+  \end{scope}
+
+  \draw[rnnarrow] (x.east) -- (join);
+  \draw[rnnarrow] (hprev.east) -- (join);
+  \draw[rnnarrow] (join) -- (z.west);
+  \draw[rnnarrow] (join) -- (r.west);
+  \draw[rnnarrow] (join) -- (cand.west);
+  \draw[rnnarrow] (r.east) -- (cand.west);
+  \draw[rnnarrow] (cand.east) -- node[above] {写入} (mix.west);
+  \draw[rnnarrow] (z.east) |- (mix.north);
+  \draw[rnnskip] (hprev.east) .. controls +(1.8,0) and +(-1.8,-0.8) .. node[below] {保留} (mix.south);
+  \draw[rnnarrow] (mix.east) -- (h.west);
+  \draw[rnnarrow] (h.south) -- (y.north);
+\end{tikzpicture}
+\caption{GRU 的门控更新：更新门控制写入比例，重置门控制候选状态对旧信息的依赖。}
+\label{fig:gru-zh}
+\end{figure}
 
 \subsection{直观算法}
 

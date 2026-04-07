@@ -1,0 +1,4 @@
+interface:
+  display_name: "TikZ Diagram Loop"
+  short_description: "Build and debug TikZ diagrams with render-feedback iteration."
+  default_prompt: "Use this skill when creating or fixing TikZ diagrams, especially when you need reusable styles, isolated rendering, screenshot inspection, and iterative visual correction."
