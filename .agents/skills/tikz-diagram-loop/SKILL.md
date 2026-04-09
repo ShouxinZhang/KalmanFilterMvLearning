@@ -1,46 +1,46 @@
 ---
 name: tikz-diagram-loop
-description: Create or repair TikZ diagrams in TeX projects when the task needs reusable styles, isolated scratch-file rendering, single-image visual inspection, and iterative correction before any integration into the main document.
+description: 在 TeX 项目中创建或修复 TikZ 图，当任务需要复用样式、在隔离的 scratch 文件中渲染、基于单张图片做可视化检查，并在集成回主文档前反复迭代修正时使用。
 ---
 
-# TikZ Diagram Loop
+# TikZ 图迭代流程
 
-Use this skill when a TikZ figure must be created or repaired and the rendered picture is the real source of truth.
+当你需要创建或修复一个 TikZ 图，而且“渲染出来的图像本身”才是真正的验收标准时，使用这个 skill。
 
-## Non-Negotiable Rule
+## 不可违背的规则
 
-During figure design and debugging, do not compile the main PDF.
+在图形设计和调试阶段，不要编译主 PDF。
 
-- Do not iterate inside `main.tex`, `main_zh-cn.tex`, slides, or thesis sources.
-- Do not use the integrated PDF as the primary review surface.
-- First make the figure correct in an isolated scratch workspace.
-- Only after the isolated figure is visually clean may you paste it back into the real document and run one integration build.
+- 不要直接在 `main.tex`、`main_zh-cn.tex`、幻灯片源文件或论文主文件里反复迭代。
+- 不要把集成后的 PDF 当作主要审阅界面。
+- 先在隔离的 scratch 工作区里把图本身调正确。
+- 只有当隔离图在视觉上已经干净、清晰后，才把它贴回真实文档，并做一次集成编译。
 
-## Workflow
+## 工作流
 
-### 1. Search for patterns
+### 1. 先搜索现有模式
 
-- Search the repo first: `rg -n "tikzpicture|tikzset|usetikzlibrary|node\\[" <target-dir>`.
-- Reuse local styles when they are already good.
-- If no good local pattern exists, read [references/search-and-patterns.md](references/search-and-patterns.md).
-- If browsing is needed, prefer the official PGF/TikZ manual first.
+- 先在仓库里搜索：`rg -n "tikzpicture|tikzset|usetikzlibrary|node\\[" <target-dir>`。
+- 如果本地已经有质量不错的样式，优先复用。
+- 如果没有合适的本地模式，阅读 [references/search-and-patterns.md](references/search-and-patterns.md)。
+- 如果需要查外部资料，优先查官方 PGF/TikZ 手册。
 
-### 2. Split style from layout
+### 2. 将样式与布局拆开
 
-- Shared colors, arrows, node styles, and helper macros go in a preamble or style file.
-- One figure file should mostly contain:
-  - named nodes,
-  - edges,
-  - short labels.
-- Keep captions and long explanation out of the scratch figure.
+- 共用的颜色、箭头、节点样式和辅助宏，放到 preamble 或样式文件里。
+- 单个图文件本身应主要只包含：
+  - 命名好的节点，
+  - 连线，
+  - 简短标签。
+- 不要把 caption 和长段解释塞进 scratch 图文件。
 
-### 3. Create a scratch workspace
+### 3. 创建 scratch 工作区
 
-- Use [scripts/init_tikz_scratch.py](scripts/init_tikz_scratch.py) to create an isolated figure workspace.
-- The scratch directory is the only place where figure debugging happens.
-- If the figure depends on project-local styles, point the scratch workspace at the real preamble with `--preamble-file`.
+- 使用 [scripts/init_tikz_scratch.py](scripts/init_tikz_scratch.py) 创建隔离的图形工作区。
+- scratch 目录是唯一允许进行图形调试的地方。
+- 如果图依赖项目里的本地样式，就通过 `--preamble-file` 让 scratch 工作区指向真实 preamble。
 
-Typical result:
+典型结果：
 
 ```text
 scratch/
@@ -51,31 +51,31 @@ scratch/
     └── NOTES.md
 ```
 
-### 4. Render the single figure only
+  ### 4. 只渲染单张图
 
-- Use [scripts/render_tikz.py](scripts/render_tikz.py) on the scratch `figure.tex`.
-- The output of interest is the single-figure PNG, not the project PDF.
-- Review that PNG with image-reading tools.
+  - 对 scratch 里的 `figure.tex` 使用 [scripts/render_tikz.py](scripts/render_tikz.py)。
+  - 真正要关注的输出是“单图 PNG”，不是整个项目 PDF。
+  - 用图像查看工具检查这个 PNG。
 
-### 5. Iterate visually
+  ### 5. 基于视觉结果迭代
 
-- If labels overlap, shorten them or move them outside the arrow.
-- If arrows cross unreadably, change the topology rather than nudging labels forever.
-- If the diagram is still crowded, split it into multiple figures.
-- Read [references/visual-debugging.md](references/visual-debugging.md) for symptom-driven fixes.
+  - 如果标签重叠，就缩短标签，或把标签移到箭头外侧。
+  - 如果箭头交叉到难以阅读，就改图的拓扑结构，而不是无休止地微调标签位置。
+  - 如果图仍然过于拥挤，就拆成多张图。
+  - 遇到具体视觉问题时，阅读 [references/visual-debugging.md](references/visual-debugging.md) 获取按症状定位的修复建议。
 
-Repeat until the isolated PNG is readable without zooming.
+  重复这个过程，直到隔离生成的 PNG 在不放大的情况下也清晰可读。
 
-### 6. Integrate once
+  ### 6. 只做一次集成
 
-- Copy the final `tikzpicture` back into the real TeX source.
-- Move reusable styles into the shared preamble only after the isolated figure is stable.
-- Run one integration build to confirm placement and caption spacing.
-- If the integrated page looks wrong, adjust the integration context sparingly; do not restart the whole design loop inside the main PDF.
+  - 把最终的 `tikzpicture` 拷回真实的 TeX 源文件。
+  - 只有在隔离图已经稳定后，才把可复用样式迁移到共享 preamble。
+  - 做一次集成编译，确认版面位置和 caption 间距。
+  - 如果集成后的页面效果不对，只做少量上下文调整；不要回到主 PDF 里重启整个设计迭代流程。
 
-## Quick Commands
+  ## 快速命令
 
-Create a scratch workspace:
+  创建 scratch 工作区：
 
 ```bash
 python3 .agents/skills/tikz-diagram-loop/scripts/init_tikz_scratch.py \
@@ -84,7 +84,7 @@ python3 .agents/skills/tikz-diagram-loop/scripts/init_tikz_scratch.py \
   --preamble-file /abs/path/preamble.tex
 ```
 
-Render the scratch figure:
+渲染 scratch 图：
 
 ```bash
 python3 .agents/skills/tikz-diagram-loop/scripts/render_tikz.py \
@@ -92,7 +92,7 @@ python3 .agents/skills/tikz-diagram-loop/scripts/render_tikz.py \
   --output-dir /tmp/gru-figure/artifacts
 ```
 
-Optional final integration check on one PDF page:
+可选：对最终集成后的某一页 PDF 做检查：
 
 ```bash
 python3 .agents/skills/tikz-diagram-loop/scripts/render_pdf_page.py \
@@ -101,10 +101,10 @@ python3 .agents/skills/tikz-diagram-loop/scripts/render_pdf_page.py \
   --output /tmp/page-3.png
 ```
 
-## Resources
+## 资源
 
-- [scripts/init_tikz_scratch.py](scripts/init_tikz_scratch.py): create an isolated scratch workspace for one figure.
-- [scripts/render_tikz.py](scripts/render_tikz.py): compile a single scratch figure to PDF/PNG.
-- [scripts/render_pdf_page.py](scripts/render_pdf_page.py): rasterize one integrated PDF page for final placement QA only.
-- [references/search-and-patterns.md](references/search-and-patterns.md): repo search order and modularization rules.
-- [references/visual-debugging.md](references/visual-debugging.md): symptom-to-fix heuristics for bad layouts.
+- [scripts/init_tikz_scratch.py](scripts/init_tikz_scratch.py)：为单张图创建隔离的 scratch 工作区。
+- [scripts/render_tikz.py](scripts/render_tikz.py)：把单张 scratch 图编译为 PDF/PNG。
+- [scripts/render_pdf_page.py](scripts/render_pdf_page.py)：仅用于最终摆放检查，将某一页已集成 PDF 栅格化为图片。
+- [references/search-and-patterns.md](references/search-and-patterns.md)：仓库内搜索顺序与模块化规则。
+- [references/visual-debugging.md](references/visual-debugging.md)：根据症状定位糟糕布局修复方法的启发式说明。

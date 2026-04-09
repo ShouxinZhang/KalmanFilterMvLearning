@@ -1,0 +1,73 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand*\HyPL@Entry[1]{}
+\HyPL@Entry{0<</S/D>>}
+\@writefile{toc}{\contentsline {section}{\numberline {1}极简背景：为什么要引入隐藏状态}{2}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}核心逻辑：循环部分到底在干什么}{2}{section.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces 循环神经网络（左）与普通前馈网络（右）的结构对比}}{3}{figure.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}把下半部分公式拆开看}{3}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}第一层：每个符号分别是什么意思}{3}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}第二层：从输入矩阵到隐藏特征，到底做了哪三步}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{第一步：线性变换。}{5}{paragraph*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{第二步：加偏置。}{6}{paragraph*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{第三步：过激活函数。}{7}{paragraph*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}第三层：从隐藏特征到输出，又在做什么}{7}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}第四层：为什么它没有“记忆”}{7}{subsection.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}具体栗子：把整个前馈流程代成数字看一遍}{8}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}先算隐藏层}{8}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}再算输出层}{9}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}为什么这就解释了 RNN 的必要性}{10}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}困惑度：语言模型到底有多“拿不准”}{10}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}为什么会需要困惑度}{10}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}先别看公式，先看直觉}{10}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}公式到底在做什么}{11}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{第一步：看真实答案的概率。}{11}{paragraph*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{第二步：取负对数。}{11}{paragraph*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{第三步：对整句取平均。}{11}{paragraph*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{第四步：再取指数。}{11}{paragraph*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}一个真正算得出来的例子}{12}{subsection.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}再看一个差模型}{12}{subsection.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}为什么有人说它像“平均分支数”}{13}{subsection.5.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.7}极端情况最能说明问题}{13}{subsection.5.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.8}最后一句话记住它}{13}{subsection.5.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}通过时间反向传播：误差是怎样沿时间倒着传回去的}{13}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}为什么普通反向传播在这里不够}{13}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}先用一句人话概括 BPTT}{14}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}黑盒视角：BPTT 到底做哪几步}{14}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}一个三步序列的直观例子}{14}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}为什么图里会出现递推求导}{15}{subsection.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{先说朴素想法。}{15}{paragraph*.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{不过这还只是直觉，下面给严格推导。}{16}{paragraph*.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.6}为什么会出现梯度消失和梯度爆炸}{18}{subsection.6.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{把截图直接翻译成人话。}{19}{paragraph*.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.7}为什么实践里常说 truncation 和 detach}{20}{subsection.6.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8}这张图到底在回答什么真实问题}{20}{subsection.6.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.9}先把截图里的出场对象翻译成人话}{20}{subsection.6.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.10}最小贯穿例子：为什么会出现“追责多远”的问题}{21}{subsection.6.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.11}上半部分：三种策略到底在干什么}{22}{subsection.6.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{1. 完整计算。}{22}{paragraph*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{2. 常规截断。}{22}{paragraph*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{3. 随机截断。}{22}{paragraph*.18}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{4. 图 8.7.1 里的三行到底在画什么。}{22}{paragraph*.19}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.12}下半部分：为什么突然写出一组线性公式}{23}{subsection.6.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{先别看推导，先看这三条式子在说什么。}{23}{paragraph*.20}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{这些权重各管什么。}{23}{paragraph*.21}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{为什么下半部分要写成线性形式，而不写更复杂的神经网络。}{23}{paragraph*.22}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{一个最关键的直觉。}{24}{paragraph*.23}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.13}再看 8.7.2：这张依赖图到底在算什么}{24}{subsection.6.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{先说真实问题。}{24}{paragraph*.24}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{先给这一节的路线图。}{24}{paragraph*.25}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{先把图里的出场对象翻译成人话。}{25}{paragraph*.26}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{最小贯穿例子。}{25}{paragraph*.27}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{为什么作者要先画依赖图。}{25}{paragraph*.28}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{目标 1：先算最容易的一项 \(\partial L / \partial o_t\)。}{26}{paragraph*.29}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{目标 2：再算输出层参数 \(\partial L / \partial W_{qh}\)。}{26}{paragraph*.30}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{目标 3：把责任从输出层传回隐藏状态，得到 \(\partial L / \partial h_t\)。}{26}{paragraph*.31}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{目标 4：有了 \(\partial L/\partial h_t\) 以后，才能继续往前传。}{27}{paragraph*.32}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{对比：这张图没有在做什么。}{27}{paragraph*.33}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{把 8.7.2 压成一句最短的话。}{27}{paragraph*.34}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.14}把整张图压成一句最短的话}{27}{subsection.6.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.15}对比：这张图没有在讲什么}{27}{subsection.6.15}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.16}最后一句话记住 BPTT}{28}{subsection.6.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}小结}{28}{section.7}\protected@file@percent }
+\gdef \@abspage@last{28}

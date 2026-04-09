@@ -1,51 +1,51 @@
-# Visual Debugging
+# 可视化调试
 
-## Symptoms and fixes
+## 症状与修复
 
-### You are tempted to debug inside the main PDF
+### 你想直接在主 PDF 里调试
 
-- Stop.
-- Copy the figure into a scratch file.
-- Render only that scratch file.
-- Return to the integrated PDF only after the single figure is already clean.
+- 停下。
+- 把图复制到 scratch 文件里。
+- 只渲染这个 scratch 文件。
+- 只有当单张图已经干净清晰后，才回到集成 PDF。
 
-### Text overlaps inside nodes
+### 节点内部文字重叠
 
-- Make labels shorter.
-- Increase node distance before increasing font size.
-- Use `\shortstack{...}` for multi-line text.
-- Move long prose to caption.
+- 缩短标签。
+- 先增大节点间距，再考虑改字号。
+- 多行文字用 `\shortstack{...}`。
+- 长段说明移到 caption。
 
-### Edge labels collide with nodes
+### 边上的标签和节点打架
 
-- Remove the label first and verify geometry.
-- Re-add labels on fewer edges.
-- Prefer one explanatory label per flow, not per arrow.
+- 先把标签删掉，确认几何布局本身没问题。
+- 只在更少的边上重新加标签。
+- 更推荐一条流一个解释性标签，而不是每根箭头都标。
 
-### Too many edge crossings
+### 连线交叉过多
 
-- Split the figure into lanes: input lane, state lane, output lane.
-- Route skip connections as dashed arcs or outer paths.
-- If a block diagram still crosses badly, separate it into two smaller figures.
+- 把图拆成几个通道：输入通道、状态通道、输出通道。
+- 把 skip connection 画成虚线弧线或外围路径。
+- 如果一个框图仍然严重交叉，就拆成两张更小的图。
 
-### Background box hides content
+### 背景框挡住内容
 
-- Add background `fit` nodes only in `on background layer`.
-- Keep the background box lighter than the foreground.
-- Fit the smallest meaningful group, not the whole diagram by default.
+- 只在 `on background layer` 中添加背景 `fit` 节点。
+- 背景框的视觉重量要轻于前景内容。
+- 默认只框住最小但有意义的一组对象，而不是整个图。
 
-### Isolated render looks fine but PDF page looks wrong
+### 单独渲染没问题，但放进 PDF 页面后效果不对
 
-- Inspect the full document page with `render_pdf_page.py`.
-- Check surrounding figure width, scaling, and caption spacing.
-- Verify that the integrated document uses the same preamble styles as the isolated render.
-- If the integrated page is wrong, treat it as an integration problem, not a figure-design problem.
+- 用 `render_pdf_page.py` 检查整页文档效果。
+- 检查周围图宽、缩放和 caption 间距。
+- 确认集成文档使用的 preamble 样式与隔离渲染时一致。
+- 如果集成页效果不对，把它当作集成问题，而不是图设计问题。
 
-## Minimum acceptance bar
+## 最低验收标准
 
-A TikZ figure is not done until:
+一个 TikZ 图在满足以下条件前，都不算完成：
 
-- the node labels are readable without zooming,
-- the main information flow is visually obvious,
-- the image survives raster inspection,
-- and the integrated PDF page still looks correct.
+- 节点标签在不放大的情况下也清晰可读，
+- 主要信息流在视觉上是一眼可见的，
+- 图像经得起栅格化检查，
+- 并且集成后的 PDF 页面仍然正确。

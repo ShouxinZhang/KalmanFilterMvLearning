@@ -1,0 +1,355 @@
+\documentclass[12pt,a4paper]{ctexart}
+\input{preamble_zh-cn.tex}
+
+\title{对状态的不完全观测截图详解\\
+\large 为什么单看当前画面不够，以及为什么要用 RNN 记忆过去}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{真实问题：这两张图到底在解决什么}
+
+这两张图真正想解决的，不是“怎么再引入一个新网络”，而是一个非常现实的问题：
+\begin{quote}
+如果智能体当前只能看到环境的一部分，它该怎么做决策？
+\end{quote}
+
+在很多强化学习教材里，我们一开始都默认“状态 \(s_t\) 是完全可见的”。也就是说，智能体只要看一眼当前状态，就已经知道做决策所需的全部信息。
+
+但真实任务常常不是这样。比如：
+\begin{itemize}
+  \item 在迷宫里，你可能只看得到自己附近一小块区域；
+  \item 在电子游戏里，屏幕上的画面只是完整游戏状态的一部分；
+  \item 在扑克、麻将这类问题里，你从来都看不到全部信息。
+\end{itemize}
+
+因此，这两张图的核心问题可以压成一句话：
+\begin{quote}
+既然当前观测不完整，那么决策时除了看现在，还必须想办法利用过去看到过的东西。
+\end{quote}
+
+\section{出场对象：先把符号翻译成人话}
+
+在这两张图里，最重要的符号其实只有四个：
+\begin{itemize}
+  \item \(s_t\)：时刻 \(t\) 的真实状态，也就是环境“实际上”是什么样；
+  \item \(o_t\)：时刻 \(t\) 的当前观测，也就是智能体这时真正看见的东西；
+  \item \(a_t\)：时刻 \(t\) 要采取的动作；
+  \item \(o_{1:t}\)：从开始到时刻 \(t\) 为止看过的全部观测历史。
+\end{itemize}
+
+所以，这里最关键的区别是：
+\begin{itemize}
+  \item \(s_t\) 是环境的真实全貌；
+  \item \(o_t\) 只是智能体此刻眼前能看到的一小部分。
+\end{itemize}
+
+而整章后面的想法，就是要回答：
+\begin{quote}
+既然 \(o_t\) 不够，那能不能把 \(o_1,o_2,\ldots,o_t\) 一起拿来，弥补当前观测的不完整？
+\end{quote}
+
+\section{第一张图：为什么“不完全观测”会让决策变难}
+
+\subsection{图 11.1 到底在画什么}
+
+第一张图用迷宫举了三个层次的例子：
+\begin{itemize}
+  \item 图 11.1(a)：完全观测。智能体能看到整个迷宫；
+  \item 图 11.1(b)：不完全观测。智能体只能看到自己附近一小块区域；
+  \item 图 11.1(c)：记忆过去观测。智能体把过去看过的局部区域也记下来，于是掌握的信息越来越多。
+\end{itemize}
+
+这三张图不是在画三种不同迷宫，而是在画：
+\begin{quote}
+同一个任务里，智能体掌握信息的多少不同，决策难度会有多大差别。
+\end{quote}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,>=Latex]
+  \tikzset{
+    dlpaneltitle/.style={font=\small\bfseries},
+    dlenvbox/.style={draw=black!55, fill=white, minimum width=3.2cm, minimum height=3.2cm},
+    dlobsbox/.style={draw=orange!80!black, fill=orange!8, line width=0.7pt},
+    dlmembox/.style={draw=green!50!black, fill=green!8, line width=0.7pt},
+    dlnote/.style={font=\small, align=center},
+    dltiny/.style={font=\scriptsize, align=center}
+  }
+
+  \node[dlpaneltitle] at (0,4.0) {真实状态 \(s_t\)};
+  \node[dlenvbox] at (0,1.9) {};
+  \draw[step=0.4, black!18] (-1.6,0.3) grid (1.6,3.5);
+  \fill[blue!65!black] (-0.2,2.0) circle (2.2pt);
+  \node[dltiny, blue!65!black] at (0.2,2.25) {智能体};
+  \draw[red!75!black, line width=1pt] (1.15,3.05) circle (0.12);
+  \node[dltiny, red!75!black] at (0.85,2.75) {出口};
+  \draw[black!65, line width=1.2pt] (-1.6,3.5)--(-1.1,3.5)--(-1.1,2.7)--(-0.6,2.7)--(-0.6,3.1)--(-0.1,3.1);
+  \draw[black!65, line width=1.2pt] (-1.2,0.7)--(-1.2,1.6)--(-0.4,1.6)--(-0.4,1.1)--(0.3,1.1)--(0.3,2.5)--(1.0,2.5)--(1.0,0.8);
+  \node[dlnote] at (0,-0.5) {看到完整迷宫\\规划相对容易};
+
+  \node[dlpaneltitle] at (4.7,4.0) {当前观测 \(o_t\)};
+  \node[dlenvbox, draw=black!18, fill=black!1] at (4.7,1.9) {};
+  \draw[step=0.4, black!10] (3.1,0.3) grid (6.3,3.5);
+  \draw[dlobsbox] (4.0,1.2) rectangle (5.4,2.6);
+  \draw[step=0.35, black!22] (4.0,1.2) grid (5.4,2.6);
+  \fill[blue!65!black] (4.65,1.95) circle (2.2pt);
+  \node[dltiny, blue!65!black] at (5.0,2.18) {当前位置};
+  \node[dlnote] at (4.7,-0.5) {只能看到局部\\无法判断全局位置};
+
+  \node[dlpaneltitle] at (9.4,4.0) {观测历史 \(o_{1:t}\)};
+  \node[dlenvbox] at (9.4,1.9) {};
+  \draw[step=0.4, black!18] (7.8,0.3) grid (11.0,3.5);
+  \draw[dlmembox] (8.2,2.2) rectangle (9.6,3.2);
+  \draw[dlmembox] (9.0,1.3) rectangle (10.4,2.7);
+  \draw[dlmembox] (8.5,0.8) rectangle (9.9,2.0);
+  \fill[blue!65!black] (9.2,2.0) circle (2.2pt);
+  \node[dltiny, blue!65!black] at (9.55,2.28) {当前};
+  \node[dlnote] at (9.4,-0.5) {把过去见过的局部\\逐步拼起来};
+
+  \draw[->, thick, black!55] (1.9,1.9) -- node[above, dlnote] {可见信息变少} (2.8,1.9);
+  \draw[->, thick, black!55] (6.5,1.9) -- node[above, dlnote] {加入记忆} (7.4,1.9);
+\end{tikzpicture}
+\caption{从完全观测到不完全观测，再到利用观测历史补全信息。关键变化不在环境本身，而在智能体手里可用于决策的信息量。}
+\label{fig:partial-observation-story}
+\end{figure}
+
+\subsection{最小贯穿例子：走迷宫时到底差在哪}
+
+想象你在走迷宫，目标是找到出口。
+
+\paragraph{情况 1：你能看到整个迷宫。}
+这就是图 11.1(a)。此时你一眼就能知道：
+\begin{itemize}
+  \item 自己在哪里；
+  \item 哪些路是死路；
+  \item 哪条路线更接近出口。
+\end{itemize}
+
+这时做决策相对容易，因为当前看到的东西，已经几乎等于问题本身。
+
+\paragraph{情况 2：你只能看到自己脚边一小块。}
+这就是图 11.1(b)。此时你虽然看到了局部墙壁，但你并不知道：
+\begin{itemize}
+  \item 自己在整个迷宫的哪个位置；
+  \item 前面这条走廊是不是你刚刚走过的；
+  \item 左转和右转到底哪边更接近出口。
+\end{itemize}
+
+所以，仅靠当前观测 \(o_t\) 做决策时，智能体会非常“盲”。
+
+\paragraph{情况 3：你把过去看过的区域也记下来。}
+这就是图 11.1(c)。虽然你现在依然只看得到局部，但你不再只有这一小块信息，因为你还记得：
+\begin{itemize}
+  \item 你刚才从哪里来；
+  \item 哪些地方已经走过；
+  \item 哪些方向曾经碰到过死路。
+\end{itemize}
+
+因此，哪怕当前观测依旧不完整，只要你把历史整合起来，你手里的信息就会更接近真实状态。
+
+\subsection{第一张图真正想说明什么}
+
+第一张图的重点不是“迷宫”本身，而是下面这条逻辑：
+\begin{enumerate}
+  \item 在完全观测问题里，当前状态 \(s_t\) 直接可见；
+  \item 在不完全观测问题里，智能体只能看到 \(o_t\)，而 \(o_t \neq s_t\)；
+  \item 如果只把 \(o_t\) 喂给策略网络，决策常常不够好；
+  \item 因此，需要把过去观测也利用起来。
+\end{enumerate}
+
+这就是为什么图中会先写出“直接用 \(\pi(a_t \mid o_t; \theta)\) 做决策效果不好”，然后再把注意力转向“记住过去”。
+
+\section{为什么不能只看当前观测}
+
+这一步特别容易被忽略，所以单独说清楚。
+
+如果当前观测已经足够，那当然没必要记忆过去。问题正是：
+\begin{quote}
+同一个局部画面 \(o_t\)，可能对应多个不同的真实状态 \(s_t\)。
+\end{quote}
+
+还是拿迷宫举例。你现在眼前看到的，可能只是：
+\begin{itemize}
+  \item 前面有墙；
+  \item 左边有路；
+  \item 右边也有路。
+\end{itemize}
+
+但这幅局部画面，完全可能在迷宫里的很多位置都出现过。也就是说：
+\begin{quote}
+只看 \(o_t\)，你无法判断“我现在到底处在哪个全局位置”。
+\end{quote}
+
+所以问题不是“当前观测没信息”，而是“当前观测的信息不够唯一”。
+
+\section{第二张图：为什么要把观测历史作为输入}
+
+\subsection{这一页到底在往前推进什么}
+
+第二张图是在回答一个更具体的问题：
+\begin{quote}
+既然只看 \(o_t\) 不够，那么策略网络到底该吃什么输入？
+\end{quote}
+
+作者给出的直接想法是：
+\[
+o_{1:t} = [o_1, o_2, \ldots, o_t].
+\]
+
+这条式子不要急着当公式看，它首先是在说一句非常直白的话：
+\begin{quote}
+不要只把“现在看到的”交给策略网络，而要把“从开头到现在看过的全部内容”都交给它。
+\end{quote}
+
+于是策略就不再写成
+\[
+\pi(a_t \mid o_t; \theta),
+\]
+而改成
+\[
+\pi(a_t \mid o_{1:t}; \theta).
+\]
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,>=Latex]
+  \tikzset{
+    dlobs/.style={draw=orange!80!black, fill=orange!8, rounded corners=2pt, minimum width=11mm, minimum height=8mm, font=\small},
+    dlstate/.style={circle, draw=blue!60!black, fill=blue!8, minimum size=8mm, inner sep=0pt, font=\small},
+    dlact/.style={draw=green!55!black, fill=green!8, rounded corners=2pt, minimum width=12mm, minimum height=8mm, font=\small},
+    dlmemory/.style={draw=black!55, fill=black!3, rounded corners=2pt, minimum width=20mm, minimum height=10mm, font=\small\bfseries, align=center},
+    dlarr/.style={-Latex, semithick}
+  }
+
+  \node[dlobs] (o1) at (0,1.6) {\(o_1\)};
+  \node[dlobs] (o2) at (1.8,1.6) {\(o_2\)};
+  \node[dlobs] (o3) at (3.6,1.6) {\(o_3\)};
+  \node[dlobs] (ot) at (5.8,1.6) {\(o_t\)};
+  \node at (4.7,1.6) {\(\cdots\)};
+
+  \node[dlstate] (h1) at (0,0.2) {\(h_1\)};
+  \node[dlstate] (h2) at (1.8,0.2) {\(h_2\)};
+  \node[dlstate] (h3) at (3.6,0.2) {\(h_3\)};
+  \node[dlstate] (ht) at (5.8,0.2) {\(h_t\)};
+  \node at (4.7,0.2) {\(\cdots\)};
+
+  \node[dlact] (a) at (7.8,0.2) {\(a_t\)};
+  \node[dlmemory] (mem) at (7.8,1.6) {历史摘要};
+
+  \draw[dlarr] (o1) -- (h1);
+  \draw[dlarr] (o2) -- (h2);
+  \draw[dlarr] (o3) -- (h3);
+  \draw[dlarr] (ot) -- (ht);
+  \draw[dlarr] (h1) -- (h2);
+  \draw[dlarr] (h2) -- (h3);
+  \draw[dlarr] (h3) -- (ht);
+  \draw[dlarr] (ht) -- (a);
+  \draw[dlarr] (ht) -- (mem);
+\end{tikzpicture}
+\caption{RNN 顺序读取观测历史 \(o_1,\ldots,o_t\)，并把它们压缩成当前隐藏状态 \(h_t\)。动作 \(a_t\) 不是只依赖最新观测，而是依赖这个“历史摘要”。}
+\label{fig:history-to-rnn}
+\end{figure}
+
+\subsection{这到底比原来多了什么}
+
+原来的策略只看当前一帧：
+\[
+\pi(a_t \mid o_t; \theta).
+\]
+
+新的策略看的是完整观测历史：
+\[
+\pi(a_t \mid o_{1:t}; \theta).
+\]
+
+两者的区别，不只是输入变长了，而是决策依据变了：
+\begin{itemize}
+  \item 前者问的是：“仅根据我现在眼前这一小块，我该做什么？”
+  \item 后者问的是：“根据我一路走来看到的全部痕迹，我现在该做什么？”
+\end{itemize}
+
+因此，第二张图真正推进的是：
+\begin{quote}
+从“基于当前观测做决策”，转向“基于观测历史做决策”。
+\end{quote}
+
+\subsection{为什么这会立刻带来一个新困难}
+
+这正是第二张图后半部分想解释的地方。
+
+如果 \(o_1,\dots,o_t\) 都是同样维度的向量，那么
+\[
+o_{1:t}
+\]
+的长度会随着 \(t\) 不断增长。
+
+也就是说：
+\begin{itemize}
+  \item 在第 \(1\) 步，输入很短；
+  \item 在第 \(10\) 步，输入更长；
+  \item 在第 \(100\) 步，输入又更长。
+\end{itemize}
+
+于是立刻出现一个工程问题：
+\begin{quote}
+普通全连接层和普通卷积层通常要求输入长度固定，但这里的观测历史长度是不断变化的。
+\end{quote}
+
+所以，这页真正想说的是：
+\begin{enumerate}
+  \item 为了解决不完全观测，最自然的做法是记住历史；
+  \item 但一旦记历史，输入就变成了可变长度；
+  \item 因此，普通固定输入长度的网络不再合适；
+  \item 这就为 RNN 出场创造了理由。
+\end{enumerate}
+
+\section{为什么 RNN 正好适合这里}
+
+到这里，RNN 的角色就不再神秘了。
+
+RNN 之所以适合这个问题，不是因为“它很高级”，而是因为它天然擅长处理：
+\begin{itemize}
+  \item 一个一个到来的输入；
+  \item 长度不固定的历史；
+  \item 需要把过去信息压缩进一个内部状态里的任务。
+\end{itemize}
+
+你可以把它理解成一种“在线记笔记”的机制：
+\begin{itemize}
+  \item 新看到一个观测 \(o_t\)，就更新一次内部记忆；
+  \item 不需要把全部历史原样摊开存储；
+  \item 只需要把“对决策最重要的那部分过去信息”压进当前状态。
+\end{itemize}
+
+所以，这两张图连起来的完整逻辑是：
+\begin{enumerate}
+  \item 当前观测 \(o_t\) 往往不足以代表真实状态 \(s_t\)；
+  \item 因此必须利用过去的观测历史；
+  \item 但完整观测历史 \(o_{1:t}\) 的长度在变；
+  \item 因而需要能处理变长序列、并能积累历史信息的模型；
+  \item RNN 正是为这类场景准备的。
+\end{enumerate}
+
+\section{对比：这两张图没有在讲什么}
+
+为了防止误读，再明确两点。
+
+\begin{itemize}
+  \item 这两张图不是在说“只要把历史都记住，就一定解决问题”。它们只是说明：在不完全观测场景里，\emph{不记历史几乎一定不行}。
+  \item 这两张图也不是在证明“RNN 永远最好”。它们只是从问题结构出发，说明“为什么像 RNN 这样的记忆模型会自然出现”。
+\end{itemize}
+
+\section{一句话总结}
+
+如果把这两张图压缩成一句最短的话，那就是：
+\begin{quote}
+在不完全观测问题里，当前看到的 \(o_t\) 不等于真实状态 \(s_t\)，所以决策必须结合过去观测；而一旦输入变成可变长度的观测历史 \(o_{1:t}\)，RNN 这类能累积记忆的模型就变得自然且必要。
+\end{quote}
+
+\end{document}

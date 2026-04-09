@@ -1,0 +1,12 @@
+\contentsline {section}{\numberline {1}Why the Screenshot Introduces Hidden State}{1}{section.1}%
+\contentsline {section}{\numberline {2}How the Recurrent Part Works}{1}{section.2}%
+\contentsline {section}{\numberline {3}The Lower Formula, Slowly Explained}{2}{section.3}%
+\contentsline {subsection}{\numberline {3.1}What Each Symbol Means}{2}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Step 1: From Input Matrix to Hidden Features}{2}{subsection.3.2}%
+\contentsline {paragraph}{First, linear mixing.}{2}{section*.2}%
+\contentsline {paragraph}{Second, add bias.}{3}{section*.3}%
+\contentsline {paragraph}{Third, apply nonlinearity.}{3}{section*.4}%
+\contentsline {subsection}{\numberline {3.3}Step 2: From Hidden Features to Output}{3}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}Why This Formula Has No Memory}{3}{subsection.3.4}%
+\contentsline {section}{\numberline {4}A Concrete Numerical Example}{3}{section.4}%
+\contentsline {section}{\numberline {5}Summary}{4}{section.5}%
