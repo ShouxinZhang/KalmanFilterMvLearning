@@ -1,18 +1,20 @@
 # Fdb version 4
-["xdvipdfmx"] 1775707210.26843 "notes/DL_learning/2/main_zh-cn.xdv" "notes/DL_learning/2/main_zh-cn.pdf" "notes/DL_learning/2/main_zh-cn" 1775707210.41396 0
-  "notes/DL_learning/2/main_zh-cn.xdv" 1775707210.22188 105332 76b2e07acede5e33d618e7f1735c1236 "xelatex"
+["xdvipdfmx"] 1775709711.07293 "main_zh-cn.xdv" "main_zh-cn.pdf" "main_zh-cn" 1775709711.22673 0
+  "main_zh-cn.xdv" 1775709711.02384 236276 451a7484a9142469ac5e5e168a2c0dd2 "xelatex"
   (generated)
-  "notes/DL_learning/2/main_zh-cn.pdf"
+  "main_zh-cn.pdf"
   (rewritten before read)
-["xelatex"] 1775707209.60181 "notes/DL_learning/2/main_zh-cn.tex" "notes/DL_learning/2/main_zh-cn.xdv" "main_zh-cn" 1775707210.41283 0
+["xelatex"] 1775709710.20304 "main_zh-cn.tex" "main_zh-cn.xdv" "main_zh-cn" 1775709711.22556 0
   "/etc/texmf/web2c/texmf.cnf" 1750470119.84641 475 c0e671620eb5563b2130f56340a5fde8 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/adobe/zapfding/pzdr.tfm" 1136768653 1528 f853c4d1b4e0550255e02831fdc8496f ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm" 1246382020 1004 54797486969f23fa377b128694d548df ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex8.tfm" 1246382020 988 bdf658c3bfc2d96d3c8b02cfc1c94c20 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam10.tfm" 1246382020 916 f87d7c45f9c908e672703b83b72241a3 ""
+  "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam5.tfm" 1246382020 924 9904cf1d39e9767e7a3622f2a125a565 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam7.tfm" 1246382020 928 2dc8d444221b7a635bb58038579b861a ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm10.tfm" 1246382020 908 2921f8a10601f252058503cc6570e581 ""
+  "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm5.tfm" 1246382020 940 75ac932a52f80982a9f8ea75d03a34cf ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm7.tfm" 1246382020 940 228d6584342e91276bf566bcf9716b83 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmex10.tfm" 1136768653 992 662f679a0b3d2d53c1b94050fdaa3f50 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/cm/cmmi10.tfm" 1136768653 1528 abec98dbc43e172678c11b3b9031252a ""
@@ -187,15 +189,15 @@
   "/usr/share/texmf/tex/latex/CJK/CJKfntef.sty" 1634405102 12851 25a9b5cc006609feb5c9a20ce24a5392 ""
   "/usr/share/texmf/web2c/texmf.cnf" 1707919699 40399 f2c302f7d2af602abb742093540a5834 ""
   "/var/lib/texmf/web2c/xetex/xelatex.fmt" 1750470607 10837534 ac23f3f035702e76738212ee2265e117 ""
-  "notes/DL_learning/2/main_zh-cn.aux" 1775707210.22075 3516 eae7b8e54538cca03d677c2bbd77d8fc "xelatex"
-  "notes/DL_learning/2/main_zh-cn.out" 1775707210.22075 2174 59a9a765218e80d5b58428d3be249865 "xelatex"
-  "notes/DL_learning/2/main_zh-cn.tex" 1775707203.50572 13938 37fca18b32d1b65baf625357d09b7a08 ""
-  "notes/DL_learning/2/main_zh-cn.toc" 1775707210.22188 1665 cb55430e9fea5d9eabd3b8a42b1f71c4 "xelatex"
-  "notes/DL_learning/2/preamble_zh-cn.tex" 1775707203.50572 370 e47319fa80d810a7f530f9d044c781da ""
+  "main_zh-cn.aux" 1775709711.02213 5108 94c520e675f47297d49df8a201b75cb9 "xelatex"
+  "main_zh-cn.out" 1775709711.02313 3140 188df2106b9cba5c1f17b94bf8f3446c "xelatex"
+  "main_zh-cn.tex" 1775709697.50924 23701 56b5fe74dd23b9e23bd3eab9948154bb ""
+  "main_zh-cn.toc" 1775709711.02373 2488 bf886ccb5eccf3d6c82d53d262492569 "xelatex"
+  "preamble_zh-cn.tex" 1775707203.50572 370 e47319fa80d810a7f530f9d044c781da ""
   (generated)
-  "notes/DL_learning/2/main_zh-cn.aux"
-  "notes/DL_learning/2/main_zh-cn.log"
-  "notes/DL_learning/2/main_zh-cn.out"
-  "notes/DL_learning/2/main_zh-cn.toc"
-  "notes/DL_learning/2/main_zh-cn.xdv"
+  "main_zh-cn.aux"
+  "main_zh-cn.log"
+  "main_zh-cn.out"
+  "main_zh-cn.toc"
+  "main_zh-cn.xdv"
   (rewritten before read)

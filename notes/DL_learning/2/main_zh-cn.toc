@@ -2,16 +2,24 @@
 \contentsline {section}{\numberline {2}出场对象：先把符号翻译成人话}{2}{section.2}%
 \contentsline {section}{\numberline {3}第一张图：为什么“不完全观测”会让决策变难}{3}{section.3}%
 \contentsline {subsection}{\numberline {3.1}图 11.1 到底在画什么}{3}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}最小贯穿例子：走迷宫时到底差在哪}{3}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.2}三种观测层次的直观对比}{3}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}最小贯穿例子：走迷宫时到底差在哪}{3}{subsection.3.3}%
 \contentsline {paragraph}{情况 1：你能看到整个迷宫。}{3}{paragraph*.2}%
 \contentsline {paragraph}{情况 2：你只能看到自己脚边一小块。}{4}{paragraph*.3}%
 \contentsline {paragraph}{情况 3：你把过去看过的区域也记下来。}{4}{paragraph*.4}%
-\contentsline {subsection}{\numberline {3.3}第一张图真正想说明什么}{4}{subsection.3.3}%
+\contentsline {subsection}{\numberline {3.4}第一张图真正想说明什么}{4}{subsection.3.4}%
 \contentsline {section}{\numberline {4}为什么不能只看当前观测}{4}{section.4}%
 \contentsline {section}{\numberline {5}第二张图：为什么要把观测历史作为输入}{5}{section.5}%
 \contentsline {subsection}{\numberline {5.1}这一页到底在往前推进什么}{5}{subsection.5.1}%
-\contentsline {subsection}{\numberline {5.2}这到底比原来多了什么}{6}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.2}这到底比原来多了什么}{5}{subsection.5.2}%
 \contentsline {subsection}{\numberline {5.3}为什么这会立刻带来一个新困难}{6}{subsection.5.3}%
 \contentsline {section}{\numberline {6}为什么 RNN 正好适合这里}{7}{section.6}%
-\contentsline {section}{\numberline {7}对比：这两张图没有在讲什么}{7}{section.7}%
-\contentsline {section}{\numberline {8}一句话总结}{7}{section.8}%
+\contentsline {subsection}{\numberline {6.1}补充解释：课本图 11.2 到底在画什么}{8}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}用一个评论分类例子读懂图 11.2}{8}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}补充解释：课本图 11.3 和图 11.4 到底在算什么}{9}{subsection.6.3}%
+\contentsline {paragraph}{第一步：把旧信息和新信息放到一起。}{9}{paragraph*.5}%
+\contentsline {paragraph}{第二步：按照规则重新混合。}{9}{paragraph*.6}%
+\contentsline {paragraph}{第三步：把结果压到合理范围。}{9}{paragraph*.7}%
+\contentsline {subsection}{\numberline {6.4}继续用同一个例子读懂图 11.3}{10}{subsection.6.4}%
+\contentsline {section}{\numberline {7}对比：这两张图没有在讲什么}{10}{section.7}%
+\contentsline {section}{\numberline {8}一句话总结}{11}{section.8}%

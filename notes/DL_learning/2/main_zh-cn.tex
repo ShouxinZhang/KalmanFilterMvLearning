@@ -70,53 +70,111 @@
 同一个任务里，智能体掌握信息的多少不同，决策难度会有多大差别。
 \end{quote}
 
-\begin{figure}[htbp]
+
+
+\subsection{三种观测层次的直观对比}
+
+\begin{figure}[ht]
 \centering
-\begin{tikzpicture}[x=1cm,y=1cm,>=Latex]
-  \tikzset{
-    dlpaneltitle/.style={font=\small\bfseries},
-    dlenvbox/.style={draw=black!55, fill=white, minimum width=3.2cm, minimum height=3.2cm},
-    dlobsbox/.style={draw=orange!80!black, fill=orange!8, line width=0.7pt},
-    dlmembox/.style={draw=green!50!black, fill=green!8, line width=0.7pt},
-    dlnote/.style={font=\small, align=center},
-    dltiny/.style={font=\scriptsize, align=center}
+\begin{tikzpicture}[>=Latex, font=\small]
+
+  % === Colours ===
+  \definecolor{wallc}{HTML}{4A4A4A}
+  \definecolor{pathc}{HTML}{F5F0E1}
+  \definecolor{agentc}{HTML}{E74C3C}
+  \definecolor{goalc}{HTML}{2ECC71}
+  \definecolor{visc}{HTML}{3498DB}
+  \definecolor{memc}{HTML}{F39C12}
+
+  % === Maze cell helper ===
+  \newcommand{\mazecell}[3]{% x, y, fill colour
+    \fill[#3] (#1,#2) rectangle ++(0.5,0.5);
+    \draw[wallc, line width=0.3pt] (#1,#2) rectangle ++(0.5,0.5);
   }
 
-  \node[dlpaneltitle] at (0,4.0) {真实状态 \(s_t\)};
-  \node[dlenvbox] at (0,1.9) {};
-  \draw[step=0.4, black!18] (-1.6,0.3) grid (1.6,3.5);
-  \fill[blue!65!black] (-0.2,2.0) circle (2.2pt);
-  \node[dltiny, blue!65!black] at (0.2,2.25) {智能体};
-  \draw[red!75!black, line width=1pt] (1.15,3.05) circle (0.12);
-  \node[dltiny, red!75!black] at (0.85,2.75) {出口};
-  \draw[black!65, line width=1.2pt] (-1.6,3.5)--(-1.1,3.5)--(-1.1,2.7)--(-0.6,2.7)--(-0.6,3.1)--(-0.1,3.1);
-  \draw[black!65, line width=1.2pt] (-1.2,0.7)--(-1.2,1.6)--(-0.4,1.6)--(-0.4,1.1)--(0.3,1.1)--(0.3,2.5)--(1.0,2.5)--(1.0,0.8);
-  \node[dlnote] at (0,-0.5) {看到完整迷宫\\规划相对容易};
+  % === (a) Full observation ===
+  \begin{scope}[shift={(0,0)}]
+    \node[font=\bfseries, anchor=south] at (1.5, 3.7) {(a) 完全观测};
+    \foreach \x in {0,...,5}{
+      \foreach \y in {0,...,5}{
+        \mazecell{\x*0.5}{\y*0.5}{pathc}
+      }
+    }
+    \mazecell{0.5}{0}{wallc!80}
+    \mazecell{0.5}{0.5}{wallc!80}
+    \mazecell{1.5}{1.0}{wallc!80}
+    \mazecell{1.5}{1.5}{wallc!80}
+    \mazecell{0.5}{2.0}{wallc!80}
+    \mazecell{2.0}{0}{wallc!80}
+    \mazecell{2.0}{0.5}{wallc!80}
+    \fill[agentc] (0.1,0.1) rectangle ++(0.3,0.3);
+    \node[font=\tiny, white] at (0.25,0.25) {A};
+    \fill[goalc] (2.6,2.6) rectangle ++(0.3,0.3);
+    \node[font=\tiny, white] at (2.75,2.75) {G};
+    \draw[visc, line width=1.2pt, rounded corners=2pt] (-0.05,-0.05) rectangle (3.05,3.05);
+    \node[font=\scriptsize, text width=3cm, align=center, anchor=north] at (1.5,-0.3) {
+      $s_t$ 完全可见
+    };
+  \end{scope}
 
-  \node[dlpaneltitle] at (4.7,4.0) {当前观测 \(o_t\)};
-  \node[dlenvbox, draw=black!18, fill=black!1] at (4.7,1.9) {};
-  \draw[step=0.4, black!10] (3.1,0.3) grid (6.3,3.5);
-  \draw[dlobsbox] (4.0,1.2) rectangle (5.4,2.6);
-  \draw[step=0.35, black!22] (4.0,1.2) grid (5.4,2.6);
-  \fill[blue!65!black] (4.65,1.95) circle (2.2pt);
-  \node[dltiny, blue!65!black] at (5.0,2.18) {当前位置};
-  \node[dlnote] at (4.7,-0.5) {只能看到局部\\无法判断全局位置};
+  % === (b) Partial observation ===
+  \begin{scope}[shift={(4.5,0)}]
+    \node[font=\bfseries, anchor=south] at (1.5, 3.7) {(b) 不完全观测};
+    \foreach \x in {0,...,5}{
+      \foreach \y in {0,...,5}{
+        \mazecell{\x*0.5}{\y*0.5}{black!12}
+      }
+    }
+    \mazecell{0}{0}{pathc}
+    \mazecell{0.5}{0}{wallc!80}
+    \mazecell{0}{0.5}{pathc}
+    \mazecell{0.5}{0.5}{wallc!80}
+    \fill[agentc] (0.1,0.1) rectangle ++(0.3,0.3);
+    \node[font=\tiny, white] at (0.25,0.25) {A};
+    \draw[visc, line width=1.2pt, rounded corners=2pt, dashed] (-0.05,-0.05) rectangle (1.05,1.05);
+    \node[font=\scriptsize, text width=3cm, align=center, anchor=north] at (1.5,-0.3) {
+      $o_t \neq s_t$，只看到局部
+    };
+  \end{scope}
 
-  \node[dlpaneltitle] at (9.4,4.0) {观测历史 \(o_{1:t}\)};
-  \node[dlenvbox] at (9.4,1.9) {};
-  \draw[step=0.4, black!18] (7.8,0.3) grid (11.0,3.5);
-  \draw[dlmembox] (8.2,2.2) rectangle (9.6,3.2);
-  \draw[dlmembox] (9.0,1.3) rectangle (10.4,2.7);
-  \draw[dlmembox] (8.5,0.8) rectangle (9.9,2.0);
-  \fill[blue!65!black] (9.2,2.0) circle (2.2pt);
-  \node[dltiny, blue!65!black] at (9.55,2.28) {当前};
-  \node[dlnote] at (9.4,-0.5) {把过去见过的局部\\逐步拼起来};
+  % === (c) Memory ===
+  \begin{scope}[shift={(9,0)}]
+    \node[font=\bfseries, anchor=south] at (1.5, 3.7) {(c) 记忆过去};
+    \foreach \x in {0,...,5}{
+      \foreach \y in {0,...,5}{
+        \mazecell{\x*0.5}{\y*0.5}{black!12}
+      }
+    }
+    \mazecell{0}{0}{pathc!50!white}
+    \mazecell{0.5}{0}{wallc!40}
+    \mazecell{0}{0.5}{pathc!50!white}
+    \mazecell{0.5}{0.5}{wallc!40}
+    \mazecell{0}{1.0}{pathc!50!white}
+    \mazecell{0}{1.5}{pathc!50!white}
+    \mazecell{0.5}{1.0}{pathc}
+    \mazecell{1.0}{1.0}{pathc}
+    \mazecell{0.5}{1.5}{wallc!80}
+    \mazecell{1.0}{1.5}{pathc}
+    \fill[agentc] (0.6,1.1) rectangle ++(0.3,0.3);
+    \node[font=\tiny, white] at (0.75,1.25) {A};
+    \draw[visc, line width=1.2pt, rounded corners=2pt, dashed] (0.45,0.95) rectangle (1.55,2.05);
+    \draw[memc, line width=1.2pt, rounded corners=2pt, dotted] (-0.05,-0.05) rectangle (1.55,2.05);
+    \node[font=\scriptsize, text width=3cm, align=center, anchor=north] at (1.5,-0.3) {
+      $o_{1:t}$ 积累信息
+    };
+  \end{scope}
 
-  \draw[->, thick, black!55] (1.9,1.9) -- node[above, dlnote] {可见信息变少} (2.8,1.9);
-  \draw[->, thick, black!55] (6.5,1.9) -- node[above, dlnote] {加入记忆} (7.4,1.9);
+  % === Legend ===
+  \node[font=\scriptsize, anchor=west] at (0,-1.0) {
+    \tikz[baseline=-0.5ex]{\draw[visc, line width=1pt] (0,0)--(0.5,0);} 当前视野\quad
+    \tikz[baseline=-0.5ex]{\draw[memc, line width=1pt, dotted] (0,0)--(0.5,0);} 记忆区域\quad
+    \tikz[baseline=-0.5ex]{\fill[agentc] (0,0) rectangle (0.25,0.25);} 智能体\quad
+    \tikz[baseline=-0.5ex]{\fill[goalc] (0,0) rectangle (0.25,0.25);} 目标
+  };
+
 \end{tikzpicture}
-\caption{从完全观测到不完全观测，再到利用观测历史补全信息。关键变化不在环境本身，而在智能体手里可用于决策的信息量。}
-\label{fig:partial-observation-story}
+\caption{迷宫中三种观测层次的对比：(a) 完全观测下 $s_t$ 直接可见；(b) 不完全观测下只能看到局部 $o_t$；(c) 将历史观测 $o_{1:t}$ 记住后，信息逐渐逼近 $s_t$。}
+\label{fig:maze-observation}
 \end{figure}
 
 \subsection{最小贯穿例子：走迷宫时到底差在哪}
@@ -216,47 +274,62 @@ o_{1:t} = [o_1, o_2, \ldots, o_t].
 \pi(a_t \mid o_{1:t}; \theta).
 \]
 
-\begin{figure}[htbp]
-\centering
-\begin{tikzpicture}[x=1cm,y=1cm,>=Latex]
-  \tikzset{
-    dlobs/.style={draw=orange!80!black, fill=orange!8, rounded corners=2pt, minimum width=11mm, minimum height=8mm, font=\small},
-    dlstate/.style={circle, draw=blue!60!black, fill=blue!8, minimum size=8mm, inner sep=0pt, font=\small},
-    dlact/.style={draw=green!55!black, fill=green!8, rounded corners=2pt, minimum width=12mm, minimum height=8mm, font=\small},
-    dlmemory/.style={draw=black!55, fill=black!3, rounded corners=2pt, minimum width=20mm, minimum height=10mm, font=\small\bfseries, align=center},
-    dlarr/.style={-Latex, semithick}
-  }
-
-  \node[dlobs] (o1) at (0,1.6) {\(o_1\)};
-  \node[dlobs] (o2) at (1.8,1.6) {\(o_2\)};
-  \node[dlobs] (o3) at (3.6,1.6) {\(o_3\)};
-  \node[dlobs] (ot) at (5.8,1.6) {\(o_t\)};
-  \node at (4.7,1.6) {\(\cdots\)};
-
-  \node[dlstate] (h1) at (0,0.2) {\(h_1\)};
-  \node[dlstate] (h2) at (1.8,0.2) {\(h_2\)};
-  \node[dlstate] (h3) at (3.6,0.2) {\(h_3\)};
-  \node[dlstate] (ht) at (5.8,0.2) {\(h_t\)};
-  \node at (4.7,0.2) {\(\cdots\)};
-
-  \node[dlact] (a) at (7.8,0.2) {\(a_t\)};
-  \node[dlmemory] (mem) at (7.8,1.6) {历史摘要};
-
-  \draw[dlarr] (o1) -- (h1);
-  \draw[dlarr] (o2) -- (h2);
-  \draw[dlarr] (o3) -- (h3);
-  \draw[dlarr] (ot) -- (ht);
-  \draw[dlarr] (h1) -- (h2);
-  \draw[dlarr] (h2) -- (h3);
-  \draw[dlarr] (h3) -- (ht);
-  \draw[dlarr] (ht) -- (a);
-  \draw[dlarr] (ht) -- (mem);
-\end{tikzpicture}
-\caption{RNN 顺序读取观测历史 \(o_1,\ldots,o_t\)，并把它们压缩成当前隐藏状态 \(h_t\)。动作 \(a_t\) 不是只依赖最新观测，而是依赖这个“历史摘要”。}
-\label{fig:history-to-rnn}
-\end{figure}
 
 \subsection{这到底比原来多了什么}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Latex, font=\small,
+    box/.style={draw, rounded corners=3pt, minimum height=10mm, minimum width=20mm,
+                align=center, inner sep=4pt},
+    obsbox/.style={box, fill=blue!8, draw=blue!50!black},
+    policybox/.style={box, fill=orange!10, draw=orange!60!black},
+    actionbox/.style={box, fill=green!10, draw=green!50!black},
+    histbox/.style={draw=purple!50!black, fill=purple!6, rounded corners=3pt,
+                    align=center, inner sep=6pt},
+    arr/.style={-Latex, semithick},
+  ]
+
+  % === Scheme A ===
+  \node[font=\bfseries, anchor=south] at (1.8, 2.8) {方案 A：仅看当前};
+
+  \node[obsbox] (otA) at (0,1.2) {$o_t$};
+  \node[policybox] (piA) at (3.0,1.2) {$\pi(\cdot\mid o_t;\theta)$};
+  \node[actionbox] (atA) at (6.0,1.2) {$a_t$};
+
+  \draw[arr] (otA) -- (piA);
+  \draw[arr] (piA) -- (atA);
+
+  \node[font=\scriptsize, text=gray, anchor=north] at (3.0,0.4) {
+    信息可能不足以区分不同 $s_t$
+  };
+
+  % === Scheme B ===
+  \node[font=\bfseries, anchor=south] at (1.8, -1.0) {方案 B：利用完整历史};
+
+  \node[obsbox, minimum width=12mm] (o1) at (-0.8,-2.5) {$o_1$};
+  \node[obsbox, minimum width=12mm] (o2) at (-0.8,-3.5) {$o_2$};
+  \node[font=\normalsize] at (-0.8,-4.3) {$\vdots$};
+  \node[obsbox, minimum width=12mm] (oT) at (-0.8,-5.0) {$o_t$};
+
+  \node[histbox, minimum width=18mm, minimum height=8mm] (hist) at (1.5,-3.5) {$o_{1:t}$};
+  \node[policybox] (piB) at (4.2,-3.5) {$\pi(\cdot\mid o_{1:t};\theta)$};
+  \node[actionbox] (atB) at (7.2,-3.5) {$a_t$};
+
+  \draw[arr] (o1.east) -- (hist.170);
+  \draw[arr] (o2.east) -- (hist.west);
+  \draw[arr] (oT.east) -- (hist.190);
+  \draw[arr] (hist) -- (piB);
+  \draw[arr] (piB) -- (atB);
+
+  \node[font=\scriptsize, text=gray, anchor=north] at (4.2,-4.5) {
+    输入长度随 $t$ 增长 $\rightarrow$ 需要能处理变长序列的模型
+  };
+
+\end{tikzpicture}
+\caption{方案 A 仅将当前观测 $o_t$ 送入策略网络；方案 B 将完整观测历史 $o_{1:t}$ 作为输入，信息更丰富但输入长度可变。}
+\label{fig:policy-comparison}
+\end{figure}
 
 原来的策略只看当前一帧：
 \[
@@ -314,6 +387,57 @@ o_{1:t}
 到这里，RNN 的角色就不再神秘了。
 
 RNN 之所以适合这个问题，不是因为“它很高级”，而是因为它天然擅长处理：
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[>=Latex, font=\small,
+    input/.style={circle, draw=blue!65!black, fill=blue!8,
+                  line width=0.5pt, minimum size=9mm, inner sep=0pt, align=center},
+    state/.style={rounded corners=3pt, draw=black!70, fill=orange!8,
+                  minimum width=14mm, minimum height=10mm, align=center, inner sep=3pt},
+    output/.style={circle, draw=green!55!black, fill=green!8,
+                   line width=0.5pt, minimum size=9mm, inner sep=0pt, align=center},
+    arr/.style={-Latex, semithick},
+    recur/.style={-Latex, semithick, dashed},
+  ]
+
+  \foreach \t/\label in {1/1, 2/2, 3/t} {
+    \pgfmathsetmacro{\xpos}{(\t-1)*3.5}
+    \node[input] (o\t) at (\xpos, 0) {$o_{\label}$};
+    \node[state] (h\t) at (\xpos, 2) {$h_{\label}$};
+    \node[output] (a\t) at (\xpos, 4) {$a_{\label}$};
+    \draw[arr] (o\t) -- node[right, font=\scriptsize]{输入} (h\t);
+    \draw[arr] (h\t) -- node[right, font=\scriptsize]{输出} (a\t);
+  }
+
+  \draw[recur] (h1.east) -- node[above, font=\scriptsize]{记忆传递} (h2.west);
+  \draw[recur] (h2.east) -- node[above, font=\scriptsize]{$\cdots$} (h3.west);
+
+  \node[font=\normalsize] at (-1.2, 2) {$\cdots$};
+
+  \node[font=\scriptsize, gray, anchor=north] at (0, -0.7) {观测};
+  \node[font=\scriptsize, gray, anchor=north] at (3.5, -0.7) {观测};
+  \node[font=\scriptsize, gray, anchor=north] at (7, -0.7) {观测};
+
+  \node[font=\scriptsize, gray, anchor=south] at (0, 4.7) {动作};
+  \node[font=\scriptsize, gray, anchor=south] at (3.5, 4.7) {动作};
+  \node[font=\scriptsize, gray, anchor=south] at (7, 4.7) {动作};
+
+  \begin{scope}[on background layer]
+    \node[draw=black!15, fill=black!3, rounded corners=4pt,
+          fit=(o1)(o3)(a1)(a3), inner sep=10pt] (bg) {};
+  \end{scope}
+
+  \node[font=\scriptsize, anchor=north, text width=8cm, align=center] at (3.5, -1.3) {
+    RNN 在每一步读入 $o_t$，更新隐状态 $h_t$，输出动作 $a_t$。\\
+    隐状态 $h_t$ 压缩了 $o_{1:t}$ 的历史信息，无需存储完整序列。
+  };
+
+\end{tikzpicture}
+\caption{RNN 处理观测序列的展开示意：每一时刻读入观测 $o_t$，通过隐状态 $h_t$ 累积历史信息，再输出动作 $a_t$。}
+\label{fig:rnn-memory}
+\end{figure}
+
 \begin{itemize}
   \item 一个一个到来的输入；
   \item 长度不固定的历史；
@@ -335,6 +459,121 @@ RNN 之所以适合这个问题，不是因为“它很高级”，而是因为�
   \item 因而需要能处理变长序列、并能积累历史信息的模型；
   \item RNN 正是为这类场景准备的。
 \end{enumerate}
+
+\subsection{补充解释：课本图 11.2 到底在画什么}
+
+如果把课本里的图 11.2 当成一个黑盒，它其实只在表达三件事：
+\begin{enumerate}
+  \item 输入不是一次性塞进去，而是按顺序一个个进入：先读 \(x_1\)，再读 \(x_2\)，一直读到 \(x_n\)；
+  \item 每读到一个新输入，RNN 都会更新一次自己的内部记忆，于是得到新的 \(h_t\)；
+  \item 这个 \(h_t\) 不是“只描述当前 \(x_t\)”，而是“概括从 \(x_1\) 到 \(x_t\) 这一整段历史”。
+\end{enumerate}
+
+所以，图里画出 \(h_1,h_2,\ldots,h_n\)，不是为了说“网络在重复做同一件无聊的小事”，而是为了强调：
+\begin{quote}
+记忆是在一步一步积累的。越往后的 \(h_t\)，通常掌握的信息越完整。
+\end{quote}
+
+这也是为什么很多分类任务只取最后一个 \(h_n\) 去做预测。因为当序列已经全部读完时，\(h_n\) 才最像对整段输入的总摘要。
+
+\subsection{用一个评论分类例子读懂图 11.2}
+
+沿用课本里的场景。假设一条商品评论只有三个词：
+\begin{quote}
+“电池 / 不 / 耐用”
+\end{quote}
+
+如果把 RNN 想成一个一路做笔记的人，那么它的内部变化可以直观地理解为：
+\begin{itemize}
+  \item 读到 “电池” 时，\(h_1\) 只知道话题和电池有关，还不知道评价是好是坏；
+  \item 读到 “不” 时，\(h_2\) 开始意识到语气可能要转向负面，但信息仍不完整；
+  \item 读到 “耐用” 时，\(h_3\) 才能把前后的关系合起来，理解成“电池不耐用”，于是形成比较明确的负面判断。
+\end{itemize}
+
+这时，把最后的 \(h_3\) 送进分类器，输出的正面概率 \(\hat p\) 就应该比较低。
+
+这个例子想强调的不是具体数字，而是一个顺序关系：
+\begin{quote}
+同样是三个词，只有按顺序读完，最后的状态才知道整句话真正想表达什么。
+\end{quote}
+
+这也顺便解释了图 11.2 的优缺点：
+\begin{itemize}
+  \item 好处是它能把变长序列压缩成固定大小的状态，方便后续分类或决策；
+  \item 局限是这个状态容量有限，序列很长时，前面较早的信息可能被后面的内容冲淡。
+\end{itemize}
+
+\subsection{补充解释：课本图 11.3 和图 11.4 到底在算什么}
+
+如果说图 11.2 解释的是“RNN 在做什么”，那么图 11.3 解释的就是：
+\begin{quote}
+RNN 到底怎样把“旧记忆”和“新输入”合成为“新记忆”。
+\end{quote}
+
+课本里的公式
+\[
+h_t = \tanh\!\bigl(W\,[h_{t-1};x_t] + b\bigr)
+\]
+可以按下面三步来理解。
+
+\paragraph{第一步：把旧信息和新信息放到一起。}
+\([h_{t-1};x_t]\) 的意思不是做什么神秘操作，而只是把两部分信息并排放好：
+\begin{itemize}
+  \item \(h_{t-1}\) 回答“我之前已经记住了什么”；
+  \item \(x_t\) 回答“我这一刻又新看到了什么”。
+\end{itemize}
+
+\paragraph{第二步：按照规则重新混合。}
+矩阵 \(W\) 可以把它看成一张“混合规则表”：
+\begin{itemize}
+  \item 每一列对应旧记忆或当前输入里的某一个分量；
+  \item 每一行对应新记忆 \(h_t\) 里的某一个分量；
+  \item 正权重表示把该信息往正方向推动；
+  \item 负权重表示把该信息往反方向推动；
+  \item 绝对值越大，说明影响越强。
+\end{itemize}
+
+而偏置 \(b\) 可以理解成默认基线或门槛：即使没有很强的新证据，系统也会先有一个默认倾向。
+
+\paragraph{第三步：把结果压到合理范围。}
+\(\tanh\) 对应图 11.4 里的 S 形曲线。它的作用不是增加新信息，而是把过大的值压回到 \(-1\) 到 \(1\) 之间。
+
+直观上，它表达的是：
+\begin{itemize}
+  \item 输入很大且为正时，输出接近 \(1\)，表示“强烈正向”；
+  \item 输入很大且为负时，输出接近 \(-1\)，表示“强烈负向”；
+  \item 输入接近 \(0\) 时，输出也接近 \(0\)，表示“态度还不明显”。
+\end{itemize}
+
+\subsection{继续用同一个例子读懂图 11.3}
+
+为了把图 11.3 读得更直观，我们暂时把隐藏状态想成一个单独的“情绪分数”：
+\begin{itemize}
+  \item 正数表示更偏正面；
+  \item 负数表示更偏负面；
+  \item 数值绝对值越大，表示判断越强。
+\end{itemize}
+
+注意，这只是为了帮助理解。真实的 \(h_t\) 往往是一个向量，不只记录情绪，还会记录主题、语气、否定关系等多种信息。
+
+现在继续看评论“电池 / 不 / 耐用”：
+\begin{itemize}
+  \item 读完 “电池” 后，旧记忆可能还是接近 \(0\)，因为只知道主题，还不知道倾向；
+  \item 读到 “不” 时，矩阵 \(W\) 会把这个词当成强烈的反向信号，线性组合的结果可能变成 \(-1.2\)；
+  \item 再经过 \(\tanh\) 后，输出大约变成 \(-0.83\)，表示新的记忆已经明显偏负面；
+  \item 接着读到 “耐用” 时，网络不会把它当成孤立的正面词，而会和前面的 “不” 一起理解，于是最终状态仍保持负面。
+\end{itemize}
+
+这组数字本身并不重要，重要的是图 11.3 想传达的因果链：
+\begin{quote}
+先把过去记忆和当前输入合在一起，再按参数设定的重要性重新加权，最后用 \(\tanh\) 把结果压成稳定的新记忆。
+\end{quote}
+
+所以，图 11.2 和图 11.3 其实是一前一后的关系：
+\begin{itemize}
+  \item 图 11.2 在讲宏观流程：序列怎样一步步变成最后的摘要；
+  \item 图 11.3 在讲微观机制：每一步的摘要究竟是怎样更新出来的。
+\end{itemize}
 
 \section{对比：这两张图没有在讲什么}
 
